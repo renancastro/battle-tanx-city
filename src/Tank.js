@@ -32,27 +32,119 @@ export class Tank {
     }
 
     createTank() {
-        // Tank body
-        const tankBodyGeometry = new THREE.BoxGeometry(2, 1, 3);
-        const tankMaterial = new THREE.MeshStandardMaterial({ color: 0x4a5320 });
-        this.body = new THREE.Mesh(tankBodyGeometry, tankMaterial);
-        this.body.position.y = 0.5;
-        this.body.castShadow = true;
-        this.scene.add(this.body);
+        // Tank materials
+        const tankMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x4a5320,  // Military green
+            roughness: 0.7,
+            metalness: 0.3
+        });
+        const trackMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a1a1a,  // Dark gray for tracks
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const detailMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2a2a2a,  // Darker gray for details
+            roughness: 0.5,
+            metalness: 0.5
+        });
 
-        // Tank turret
-        const turretGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.5, 8);
-        this.turret = new THREE.Mesh(turretGeometry, tankMaterial);
-        this.turret.position.y = 1;
-        this.turret.castShadow = true;
-        this.body.add(this.turret);
+        // Main hull (sloped armor)
+        const hullGeometry = new THREE.BoxGeometry(4, 1.2, 5);
+        this.body = new THREE.Mesh(hullGeometry, tankMaterial);
+        this.body.position.y = 0.6;
+        
+        // Front slope
+        const frontSlopeGeometry = new THREE.BoxGeometry(4, 1.4, 1.2);
+        const frontSlope = new THREE.Mesh(frontSlopeGeometry, tankMaterial);
+        frontSlope.position.set(0, 0.2, -2);
+        frontSlope.rotation.x = Math.PI * 0.1;
+        this.body.add(frontSlope);
 
-        // Tank cannon
-        const cannonGeometry = new THREE.CylinderGeometry(0.1, 0.1, 2);
-        this.cannon = new THREE.Mesh(cannonGeometry, tankMaterial);
-        this.cannon.position.z = 1;
+        // Track assemblies
+        const trackGeometry = new THREE.BoxGeometry(0.8, 0.5, 5.4);
+        const leftTrack = new THREE.Mesh(trackGeometry, trackMaterial);
+        const rightTrack = new THREE.Mesh(trackGeometry, trackMaterial);
+        leftTrack.position.set(-1.8, -0.35, 0);
+        rightTrack.position.set(1.8, -0.35, 0);
+        this.body.add(leftTrack);
+        this.body.add(rightTrack);
+
+        // Track wheels
+        const wheelGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.4, 16);
+        const wheelPositions = [-2.2, -1.5, -0.8, 0, 0.8, 1.5, 2.2];
+        wheelPositions.forEach(z => {
+            const leftWheel = new THREE.Mesh(wheelGeometry, detailMaterial);
+            const rightWheel = new THREE.Mesh(wheelGeometry, detailMaterial);
+            leftWheel.rotation.z = Math.PI / 2;
+            rightWheel.rotation.z = Math.PI / 2;
+            leftWheel.position.set(-1.8, -0.35, z);
+            rightWheel.position.set(1.8, -0.35, z);
+            this.body.add(leftWheel);
+            this.body.add(rightWheel);
+        });
+
+        // Turret base (characteristic Abrams angular turret)
+        const turretBaseGeometry = new THREE.BoxGeometry(2.2, 0.6, 2.4);
+        this.turret = new THREE.Mesh(turretBaseGeometry, tankMaterial);
+        this.turret.position.y = 0.9;
+
+        // Turret front slope
+        const turretFrontGeometry = new THREE.BoxGeometry(2.2, 0.7, 0.8);
+        const turretFront = new THREE.Mesh(turretFrontGeometry, tankMaterial);
+        turretFront.position.set(0, 0, -1.2);
+        turretFront.rotation.x = -Math.PI * 0.1;
+        this.turret.add(turretFront);
+
+        // Turret side armor
+        const sideArmorGeometry = new THREE.BoxGeometry(0.3, 0.5, 1.8);
+        const leftArmor = new THREE.Mesh(sideArmorGeometry, tankMaterial);
+        const rightArmor = new THREE.Mesh(sideArmorGeometry, tankMaterial);
+        leftArmor.position.set(-1.2, 0, -0.3);
+        rightArmor.position.set(1.2, 0, -0.3);
+        this.turret.add(leftArmor);
+        this.turret.add(rightArmor);
+
+        // Main gun (120mm smoothbore)
+        const mainGunGeometry = new THREE.CylinderGeometry(0.12, 0.12, 4, 16);
+        this.cannon = new THREE.Mesh(mainGunGeometry, detailMaterial);
+        this.cannon.position.z = 2;
         this.cannon.rotation.x = Math.PI / 2;
+
+        // Gun mantlet
+        const mantletGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.35, 16);
+        const mantlet = new THREE.Mesh(mantletGeometry, detailMaterial);
+        mantlet.rotation.x = Math.PI / 2;
+        mantlet.position.z = 0.2;
+        this.cannon.add(mantlet);
+
+        // Commander's cupola
+        const cupolaGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.35, 8);
+        const cupola = new THREE.Mesh(cupolaGeometry, detailMaterial);
+        cupola.position.set(-0.5, 0.45, 0.3);
+        this.turret.add(cupola);
+
+        // Loader's hatch
+        const loaderHatchGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.25, 8);
+        const loaderHatch = new THREE.Mesh(loaderHatchGeometry, detailMaterial);
+        loaderHatch.position.set(0.5, 0.45, 0.3);
+        this.turret.add(loaderHatch);
+
+        // Add turret to body
+        this.body.add(this.turret);
+        // Add cannon to turret
         this.turret.add(this.cannon);
+
+        // Enable shadows
+        this.body.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                object.castShadow = true;
+                object.receiveShadow = true;
+            }
+        });
+
+        // Add to scene
+        this.scene.add(this.body);
 
         // Projectile template
         this.projectileGeometry = new THREE.SphereGeometry(0.2);
