@@ -42,12 +42,12 @@ directionalLight.position.set(5, 5, 5);
 directionalLight.castShadow = true;
 
 // Configure shadow properties
-directionalLight.shadow.camera.left = -300;
-directionalLight.shadow.camera.right = 300;
-directionalLight.shadow.camera.top = 300;
-directionalLight.shadow.camera.bottom = -300;
+directionalLight.shadow.camera.left = -450;
+directionalLight.shadow.camera.right = 450;
+directionalLight.shadow.camera.top = 450;
+directionalLight.shadow.camera.bottom = -450;
 directionalLight.shadow.camera.near = 0.1;
-directionalLight.shadow.camera.far = 600;
+directionalLight.shadow.camera.far = 900;
 directionalLight.shadow.mapSize.width = 4096;
 directionalLight.shadow.mapSize.height = 4096;
 directionalLight.shadow.bias = -0.001;
@@ -55,7 +55,7 @@ directionalLight.shadow.bias = -0.001;
 scene.add(directionalLight);
 
 // Ground
-const groundGeometry = new THREE.PlaneGeometry(600, 600);
+const groundGeometry = new THREE.PlaneGeometry(900, 900);
 const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 });
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.x = -Math.PI / 2;
@@ -64,9 +64,9 @@ scene.add(ground);
 
 // Create grid pattern
 function createGrid() {
-    const gridSize = 600; // Total size of the map
+    const gridSize = 900; // Total size of the map
     const blockSize = 40;  // Size of each block
-    const baseOffset = 270; // Same as tank base offset
+    const baseOffset = 380; // Increased distance from center to base
     const baseSize = 40;   // Slightly larger than tank base for clearance
     const gridHelper = new THREE.Group();
 
@@ -353,8 +353,8 @@ function createTankBase(x, z) {
 
 // Generate tank bases in corners
 function generateBases() {
-    const mapSize = 600;
-    const baseOffset = 270; // Distance from center to base center
+    const mapSize = 900;
+    const baseOffset = 380; // Increased distance from center to base center
 
     // Create bases in each corner
     createTankBase(-baseOffset, -baseOffset);  // Bottom-left
@@ -368,8 +368,73 @@ function generateCity() {
     // Empty function - no roads or plaza
 }
 
+// Create boundary walls around the map
+function createBoundaryWalls() {
+    const wallHeight = 8;
+    const wallThickness = 4;
+    const mapSize = 900;
+    const wallOffset = mapSize/2 - wallThickness/2; // Position walls at the edge of the map
+
+    // Wall material
+    const wallMaterial = new THREE.MeshStandardMaterial({
+        color: 0x505050,
+        roughness: 0.7,
+        metalness: 0.3
+    });
+
+    // Create the four walls
+    const walls = [
+        // North wall (top)
+        { length: mapSize, x: 0, z: -wallOffset, rotation: 0 },
+        // South wall (bottom)
+        { length: mapSize, x: 0, z: wallOffset, rotation: 0 },
+        // East wall (right)
+        { length: mapSize, x: wallOffset, z: 0, rotation: Math.PI/2 },
+        // West wall (left)
+        { length: mapSize, x: -wallOffset, z: 0, rotation: Math.PI/2 }
+    ];
+
+    walls.forEach(wall => {
+        const wallGeometry = new THREE.BoxGeometry(wall.length, wallHeight, wallThickness);
+        const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial);
+        
+        wallMesh.position.set(wall.x, wallHeight/2, wall.z);
+        wallMesh.rotation.y = wall.rotation;
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        
+        scene.add(wallMesh);
+    });
+
+    // Add corner pillars
+    const pillarSize = 6;
+    const pillarHeight = wallHeight + 2;
+    const pillarGeometry = new THREE.BoxGeometry(pillarSize, pillarHeight, pillarSize);
+    const pillarMaterial = new THREE.MeshStandardMaterial({
+        color: 0x404040,
+        roughness: 0.8,
+        metalness: 0.2
+    });
+
+    const pillarPositions = [
+        { x: -wallOffset, z: -wallOffset }, // Northwest
+        { x: wallOffset, z: -wallOffset },  // Northeast
+        { x: wallOffset, z: wallOffset },   // Southeast
+        { x: -wallOffset, z: wallOffset }   // Southwest
+    ];
+
+    pillarPositions.forEach(pos => {
+        const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
+        pillar.position.set(pos.x, pillarHeight/2, pos.z);
+        pillar.castShadow = true;
+        pillar.receiveShadow = true;
+        scene.add(pillar);
+    });
+}
+
 generateCity();
 generateBases();
+createBoundaryWalls();
 
 // Create player tank
 const tank = new Tank(scene);

@@ -158,6 +158,7 @@ export class Tank {
 
     updateProjectiles() {
         const now = Date.now();
+        const mapBoundary = 450 - 4; // Same boundary as tank movement
         
         // Update projectiles
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
@@ -165,9 +166,23 @@ export class Tank {
             
             // Move projectile
             if (projectile.userData.velocity) {
-                projectile.position.x += projectile.userData.velocity.x;
+                const nextX = projectile.position.x + projectile.userData.velocity.x;
+                const nextZ = projectile.position.z + projectile.userData.velocity.z;
+
+                // Check for wall collision
+                if (Math.abs(nextX) >= mapBoundary || Math.abs(nextZ) >= mapBoundary) {
+                    // Create impact effect
+                    this.createImpactEffect(projectile.position);
+                    // Remove projectile
+                    this.scene.remove(projectile);
+                    this.projectiles.splice(i, 1);
+                    continue;
+                }
+
+                // Update position if no collision
+                projectile.position.x = nextX;
                 projectile.position.y += projectile.userData.velocity.y;
-                projectile.position.z += projectile.userData.velocity.z;
+                projectile.position.z = nextZ;
             }
             
             // Remove old projectiles
@@ -198,16 +213,71 @@ export class Tank {
         }
     }
 
+    createImpactEffect(position) {
+        // Create impact flash
+        const impactGeometry = new THREE.SphereGeometry(0.3);
+        const impactMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffff00,
+            transparent: true,
+            opacity: 1
+        });
+        const impact = new THREE.Mesh(impactGeometry, impactMaterial);
+        impact.position.copy(position);
+
+        // Add impact light
+        const impactLight = new THREE.PointLight(0xffff00, 2, 5);
+        impactLight.position.copy(position);
+        
+        this.scene.add(impact);
+        this.scene.add(impactLight);
+
+        // Animate and remove impact effect
+        const startTime = Date.now();
+        const duration = 200;
+
+        const animate = () => {
+            const now = Date.now();
+            const age = now - startTime;
+            
+            if (age < duration) {
+                const fadeRatio = 1 - age / duration;
+                impact.material.opacity = fadeRatio;
+                impactLight.intensity = 2 * fadeRatio;
+                impact.scale.set(1 + age/duration, 1 + age/duration, 1 + age/duration);
+                requestAnimationFrame(animate);
+            } else {
+                this.scene.remove(impact);
+                this.scene.remove(impactLight);
+            }
+        };
+
+        animate();
+    }
+
     update(ground, mouse, raycaster, camera) {
-        // Tank movement
+        // Calculate next position before moving
+        let nextX = this.body.position.x;
+        let nextZ = this.body.position.z;
+
+        // Tank movement with boundary checks
+        const mapBoundary = 450 - 4; // Half map size minus wall thickness and some margin
+        
         if (this.keys.w) {
-            this.body.position.x += Math.sin(this.body.rotation.y) * this.speed;
-            this.body.position.z += Math.cos(this.body.rotation.y) * this.speed;
+            nextX = this.body.position.x + Math.sin(this.body.rotation.y) * this.speed;
+            nextZ = this.body.position.z + Math.cos(this.body.rotation.y) * this.speed;
         }
         if (this.keys.s) {
-            this.body.position.x -= Math.sin(this.body.rotation.y) * this.speed;
-            this.body.position.z -= Math.cos(this.body.rotation.y) * this.speed;
+            nextX = this.body.position.x - Math.sin(this.body.rotation.y) * this.speed;
+            nextZ = this.body.position.z - Math.cos(this.body.rotation.y) * this.speed;
         }
+
+        // Only update position if within bounds
+        if (Math.abs(nextX) < mapBoundary && Math.abs(nextZ) < mapBoundary) {
+            this.body.position.x = nextX;
+            this.body.position.z = nextZ;
+        }
+
+        // Tank rotation
         if (this.keys.a) {
             this.body.rotation.y += this.rotationSpeed;
         }
