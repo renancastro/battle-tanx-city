@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Tank } from './Tank.js';
 import { Base } from './Base.js';
+import { Road } from './Road.js';
 
 // Game state
 const keys = {
@@ -213,9 +214,14 @@ function generateBases() {
     new Base(scene, baseOffset, baseOffset);    // Top-right
 }
 
-// Empty city generation (keeping the function for future use if needed)
+// City generation with main road
 function generateCity() {
-    // Empty function - no roads or plaza
+    // Create bases first
+    generateBases();
+    
+    // Create main road
+    const roadSystem = new Road(scene);
+    roadSystem.createMainRoad();
 }
 
 // Create boundary walls around the map
@@ -283,7 +289,6 @@ function createBoundaryWalls() {
 }
 
 generateCity();
-generateBases();
 createBoundaryWalls();
 
 // Create player tank
