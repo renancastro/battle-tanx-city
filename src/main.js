@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Tank } from './Tank.js';
 
 // Game state
 const keys = {
@@ -9,8 +10,8 @@ const keys = {
 };
 
 // Tank properties
-const tankSpeed = 0.1;
-const tankRotationSpeed = 0.03;
+const tankSpeed = 1.0;
+const tankRotationSpeed = 0.15;
 const turretRotationSpeed = 0.1;
 
 // Projectile properties
@@ -39,87 +40,95 @@ scene.add(ambientLight);
 const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
 directionalLight.position.set(5, 5, 5);
 directionalLight.castShadow = true;
+
+// Configure shadow properties
+directionalLight.shadow.camera.left = -300;
+directionalLight.shadow.camera.right = 300;
+directionalLight.shadow.camera.top = 300;
+directionalLight.shadow.camera.bottom = -300;
+directionalLight.shadow.camera.near = 0.1;
+directionalLight.shadow.camera.far = 600;
+directionalLight.shadow.mapSize.width = 4096;
+directionalLight.shadow.mapSize.height = 4096;
+directionalLight.shadow.bias = -0.001;
+
 scene.add(directionalLight);
 
 // Ground
-const groundGeometry = new THREE.PlaneGeometry(50, 50);
+const groundGeometry = new THREE.PlaneGeometry(600, 600);
 const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 });
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Tank body
-const tankBodyGeometry = new THREE.BoxGeometry(2, 1, 3);
-const tankMaterial = new THREE.MeshStandardMaterial({ color: 0x4a5320 });
-const tankBody = new THREE.Mesh(tankBodyGeometry, tankMaterial);
-tankBody.position.y = 0.5;
-tankBody.castShadow = true;
-scene.add(tankBody);
+// Create tank bases in corners
+function createTankBase(x, z) {
+    const baseGroup = new THREE.Group();
 
-// Tank turret
-const turretGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.5, 8);
-const turret = new THREE.Mesh(turretGeometry, tankMaterial);
-turret.position.y = 1;
-turret.castShadow = true;
-tankBody.add(turret);
-
-// Tank cannon
-const cannonGeometry = new THREE.CylinderGeometry(0.1, 0.1, 2);
-const cannon = new THREE.Mesh(cannonGeometry, tankMaterial);
-cannon.position.z = 1;
-cannon.rotation.x = Math.PI / 2;
-turret.add(cannon);
-
-// Projectile template
-const projectileGeometry = new THREE.SphereGeometry(0.2);
-const projectileMaterial = new THREE.MeshBasicMaterial({ 
-    color: 0xff0000,
-    emissive: 0xff0000,
-    emissiveIntensity: 1,
-    toneMapped: false
-});
-
-// Create muzzle flash
-function createMuzzleFlash() {
-    // Create the flash mesh
-    const flashGeometry = new THREE.ConeGeometry(0.3, 0.8, 16);
-    const flashMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffa500,
-        transparent: true,
-        opacity: 1
+    // Main platform
+    const baseGeometry = new THREE.BoxGeometry(30, 1, 30);
+    const baseMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x505050,  // Darker than ground
+        roughness: 0.7,
+        metalness: 0.3
     });
-    const flash = new THREE.Mesh(flashGeometry, flashMaterial);
-    
-    // Create a container for proper positioning
-    const flashContainer = new THREE.Object3D();
-    cannon.add(flashContainer);
-    
-    // Position and rotate the container
-    flashContainer.position.set(0, 1, 0);
-    flashContainer.rotation.x = -Math.PI / 2;  // Inverted rotation to point forward
-    
-    // Add flash to container with proper rotation and position
-    flash.rotation.x = -Math.PI / 2;
-    flash.position.set(0, 0, 0);
-    flash.visible = false;
-    flashContainer.add(flash);
-    
-    // Create a point light for the flash
-    const light = new THREE.PointLight(0xffa500, 5, 3);
-    light.position.copy(flash.position);
-    light.visible = false;
-    flashContainer.add(light);
-    
-    return {
-        mesh: flash,
-        light: light
-    };
+    const base = new THREE.Mesh(baseGeometry, baseMaterial);
+    base.position.y = 0.5; // Half height to sit on ground
+    base.castShadow = true;
+    base.receiveShadow = true;
+    baseGroup.add(base);
+
+    // Add border/rim
+    const rimGeometry = new THREE.BoxGeometry(33, 0.5, 33);
+    const rimMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x404040,  // Even darker for contrast
+        roughness: 0.8,
+        metalness: 0.2
+    });
+    const rim = new THREE.Mesh(rimGeometry, rimMaterial);
+    rim.position.y = 0.25; // Place at bottom of platform
+    rim.castShadow = true;
+    rim.receiveShadow = true;
+    baseGroup.add(rim);
+
+    baseGroup.position.set(x, 0, z);
+    scene.add(baseGroup);
 }
+
+// Generate tank bases in corners
+function generateBases() {
+    const mapSize = 600;
+    const baseOffset = 270; // Distance from center to base center
+
+    // Create bases in each corner
+    createTankBase(-baseOffset, -baseOffset);  // Bottom-left
+    createTankBase(-baseOffset, baseOffset);   // Top-left
+    createTankBase(baseOffset, -baseOffset);   // Bottom-right
+    createTankBase(baseOffset, baseOffset);    // Top-right
+}
+
+// Empty city generation (keeping the function for future use if needed)
+function generateCity() {
+    // Empty function - no roads or plaza
+}
+
+generateCity();
+generateBases();
+
+// Create player tank
+const tank = new Tank(scene);
 
 // Camera setup
 camera.position.set(0, 10, -10);
-camera.lookAt(tankBody.position);
+camera.lookAt(tank.getPosition());
+
+// Camera controls
+const cameraSettings = {
+    minHeight: 5,
+    maxHeight: 20,
+    scrollSpeed: 0.5
+};
 
 // Mouse movement
 const mouse = new THREE.Vector2();
@@ -130,46 +139,18 @@ function onMouseMove(event) {
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 }
 
-function fireProjectile() {
-    const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
-    
-    // Position projectile at the end of the cannon
-    const cannonTip = new THREE.Vector3();
-    cannon.getWorldPosition(cannonTip);
-    
-    // Get the cannon's forward direction
-    const direction = new THREE.Vector3(0, 0, 1);
-    direction.applyQuaternion(turret.getWorldQuaternion(new THREE.Quaternion()));
-    
-    // Move the spawn point to the end of the cannon
-    cannonTip.add(direction.multiplyScalar(2));
-    projectile.position.copy(cannonTip);
-    
-    // Reset direction for velocity
-    direction.set(0, 0, 1);
-    direction.applyQuaternion(turret.getWorldQuaternion(new THREE.Quaternion()));
-    
-    // Set velocity
-    projectile.userData.velocity = direction.multiplyScalar(projectileSpeed);
-    projectile.userData.createdAt = Date.now();
-    
-    scene.add(projectile);
-    projectiles.push(projectile);
-
-    // Show muzzle flash
-    if (!muzzleFlash) {
-        const flash = createMuzzleFlash();
-        muzzleFlash = flash.mesh;
-        flashLight = flash.light;
-    }
-    muzzleFlash.visible = true;
-    flashLight.visible = true;
-    lastFlashTime = Date.now();
+function onMouseWheel(event) {
+    // Adjust camera height based on scroll direction
+    const delta = Math.sign(event.deltaY) * cameraSettings.scrollSpeed;
+    const newHeight = Math.max(cameraSettings.minHeight, 
+                             Math.min(cameraSettings.maxHeight, 
+                                    camera.position.y + delta));
+    camera.position.y = newHeight;
 }
 
 function onMouseDown(event) {
     if (event.button === 0) { // Left mouse button
-        fireProjectile();
+        tank.fireProjectile();
     }
 }
 
@@ -191,6 +172,7 @@ function onKeyUp(event) {
 // Event listeners
 window.addEventListener('mousemove', onMouseMove);
 window.addEventListener('mousedown', onMouseDown);
+window.addEventListener('wheel', onMouseWheel);
 window.addEventListener('keydown', onKeyDown);
 window.addEventListener('keyup', onKeyUp);
 window.addEventListener('resize', () => {
@@ -199,88 +181,26 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Update projectiles
-function updateProjectiles() {
-    const now = Date.now();
-    
-    // Update projectiles
-    for (let i = projectiles.length - 1; i >= 0; i--) {
-        const projectile = projectiles[i];
-        
-        // Move projectile
-        if (projectile.userData.velocity) {
-            projectile.position.x += projectile.userData.velocity.x;
-            projectile.position.y += projectile.userData.velocity.y;
-            projectile.position.z += projectile.userData.velocity.z;
-        }
-        
-        // Remove old projectiles
-        if (now - projectile.userData.createdAt > projectileLifetime) {
-            scene.remove(projectile);
-            projectiles.splice(i, 1);
-            continue;
-        }
-    }
-
-    // Update muzzle flash
-    if (muzzleFlash && muzzleFlash.visible) {
-        if (now - lastFlashTime > flashDuration) {
-            muzzleFlash.visible = false;
-            flashLight.visible = false;
-        } else {
-            // Animate flash opacity and light intensity
-            const flashAge = now - lastFlashTime;
-            const fadeRatio = 1 - flashAge / flashDuration;
-            muzzleFlash.material.opacity = fadeRatio;
-            flashLight.intensity = 5 * fadeRatio;
-            
-            // Animate flash scale
-            const scalePhase = (1 - fadeRatio) * Math.PI;
-            const scale = 1 + 0.5 * Math.sin(scalePhase);
-            muzzleFlash.scale.set(scale, scale, scale);
-        }
-    }
-}
-
 // Animation loop
 function animate() {
     requestAnimationFrame(animate);
 
-    // Tank movement
-    if (keys.w) {
-        tankBody.position.x += Math.sin(tankBody.rotation.y) * tankSpeed;
-        tankBody.position.z += Math.cos(tankBody.rotation.y) * tankSpeed;
-    }
-    if (keys.s) {
-        tankBody.position.x -= Math.sin(tankBody.rotation.y) * tankSpeed;
-        tankBody.position.z -= Math.cos(tankBody.rotation.y) * tankSpeed;
-    }
-    if (keys.a) {
-        tankBody.rotation.y += tankRotationSpeed;
-    }
-    if (keys.d) {
-        tankBody.rotation.y -= tankRotationSpeed;
-    }
+    // Update tank
+    tank.update(ground, mouse, raycaster, camera);
 
-    // Turret rotation
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(ground);
-    
-    if (intersects.length > 0) {
-        const targetPoint = intersects[0].point;
-        const tankPosition = tankBody.position.clone();
-        const direction = targetPoint.sub(tankPosition);
-        const angle = Math.atan2(direction.x, direction.z);
-        turret.rotation.y = -tankBody.rotation.y + angle;
-    }
+    // Update camera position with larger offset
+    const tankPos = tank.getPosition();
+    camera.position.x = tankPos.x;
+    camera.position.z = tankPos.z - 20; // Increased camera distance
+    camera.lookAt(tankPos);
 
-    // Update projectiles
-    updateProjectiles();
-
-    // Update camera position
-    camera.position.x = tankBody.position.x;
-    camera.position.z = tankBody.position.z - 10;
-    camera.lookAt(tankBody.position);
+    // Update directional light position relative to tank with larger offset
+    directionalLight.position.set(
+        tankPos.x + 20,
+        50,
+        tankPos.z + 20
+    );
+    directionalLight.target = tank.body;
 
     renderer.render(scene, camera);
 }
