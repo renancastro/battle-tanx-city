@@ -20,12 +20,13 @@ export class Tank {
         };
 
         // Projectile properties
-        this.projectileSpeed = 0.5;
+        this.projectileSpeed = 8.0;
         this.projectiles = [];
-        this.projectileLifetime = 3000; // milliseconds
+        this.projectileLifetime = 1500;
+        this.projectileSize = 0.15;
 
         // Muzzle flash properties
-        this.flashDuration = 150; // milliseconds
+        this.flashDuration = 100;
         this.muzzleFlash = null;
         this.flashLight = null;
         this.lastFlashTime = 0;
@@ -179,8 +180,8 @@ export class Tank {
     }
 
     createMuzzleFlash() {
-        // Create the flash mesh with larger dimensions
-        const flashGeometry = new THREE.ConeGeometry(0.4, 1.2, 16);
+        // Create the flash mesh with adjusted dimensions
+        const flashGeometry = new THREE.ConeGeometry(0.3, 1.0, 16);
         const flashMaterial = new THREE.MeshBasicMaterial({
             color: 0xffa500,
             transparent: true,
@@ -192,7 +193,7 @@ export class Tank {
         const flashContainer = new THREE.Object3D();
         this.cannon.add(flashContainer);
         
-        // Position and rotate the container - moved further out
+        // Position and rotate the container
         flashContainer.position.set(0, 2, 0);
         flashContainer.rotation.x = -Math.PI / 2;
         
@@ -202,8 +203,8 @@ export class Tank {
         flash.visible = false;
         flashContainer.add(flash);
         
-        // Create a point light for the flash - increased range and intensity
-        const light = new THREE.PointLight(0xffa500, 8, 5);
+        // Create a point light for the flash - increased intensity for brighter flash
+        const light = new THREE.PointLight(0xffa500, 10, 4);
         light.position.copy(flash.position);
         light.visible = false;
         flashContainer.add(light);
@@ -215,7 +216,17 @@ export class Tank {
     }
 
     fireProjectile() {
-        const projectile = new THREE.Mesh(this.projectileGeometry, this.projectileMaterial);
+        const projectile = new THREE.Mesh(
+            new THREE.SphereGeometry(this.projectileSize),
+            new THREE.MeshStandardMaterial({ 
+                color: 0xff4400,
+                emissive: 0xff4400,
+                emissiveIntensity: 2,
+                metalness: 0.3,
+                roughness: 0.4,
+                toneMapped: false
+            })
+        );
         
         // Position projectile at the end of the cannon
         const cannonTip = new THREE.Vector3();
@@ -283,36 +294,90 @@ export class Tank {
                 const nextX = projectile.position.x + projectile.userData.velocity.x;
                 const nextZ = projectile.position.z + projectile.userData.velocity.z;
 
-                // Check for map boundary wall collision
+                // Get all bases and buildings from the scene
+                const bases = [];
+                const buildings = [];
+                this.scene.traverse((object) => {
+                    if (object.type === 'Group') {
+                        if (object.userData.isBase) {
+                            bases.push(object.userData.baseInstance);
+                        } else if (object.userData.isBuilding) {
+                            buildings.push(object);
+                        }
+                    }
+                });
+
+                // Check collision with map boundary walls
                 if (Math.abs(nextX) >= mapBoundary || Math.abs(nextZ) >= mapBoundary) {
-                    // Create impact effect
                     this.createImpactEffect(projectile.position);
-                    // Remove projectile
                     this.scene.remove(projectile);
                     this.projectiles.splice(i, 1);
                     continue;
                 }
 
-                // Get all bases from the scene
-                const bases = [];
-                this.scene.traverse((object) => {
-                    if (object.type === 'Group' && object.userData.isBase) {
-                        bases.push(object.userData.baseInstance);
-                    }
-                });
+                // Check collision with buildings
+                let hitBuilding = false;
+                for (const building of buildings) {
+                    // Simple box collision check
+                    const buildingBounds = {
+                        minX: building.position.x - 10,
+                        maxX: building.position.x + 10,
+                        minZ: building.position.z - 10,
+                        maxZ: building.position.z + 10
+                    };
 
-                // Check collision with each base's walls
-                let hitBaseWall = false;
-                for (const base of bases) {
-                    if (base.isPointCollidingWithWalls(nextX, nextZ) && !base.isPointNearGate(nextX, nextZ)) {
+                    if (nextX >= buildingBounds.minX && nextX <= buildingBounds.maxX &&
+                        nextZ >= buildingBounds.minZ && nextZ <= buildingBounds.maxZ) {
+                        // Calculate impact point
+                        const impactPoint = new THREE.Vector3(
+                            projectile.position.x,
+                            projectile.position.y,
+                            projectile.position.z
+                        );
+
                         // Create impact effect
-                        this.createImpactEffect(projectile.position);
+                        this.createImpactEffect(impactPoint);
+
+                        // Deal damage to building
+                        if (building.userData.buildingInstance) {
+                            building.userData.buildingInstance.takeDamage(25);
+                        }
+
                         // Remove projectile
                         this.scene.remove(projectile);
                         this.projectiles.splice(i, 1);
-                        hitBaseWall = true;
+                        hitBuilding = true;
                         break;
                     }
+                }
+
+                if (hitBuilding) continue;
+
+                // Check collision with each base's walls with interpolation
+                let hitBaseWall = false;
+                for (const base of bases) {
+                    // Check multiple points along the projectile's path
+                    const steps = 5; // Number of interpolation steps
+                    for (let step = 0; step <= steps; step++) {
+                        const t = step / steps;
+                        const checkX = projectile.position.x + (nextX - projectile.position.x) * t;
+                        const checkZ = projectile.position.z + (nextZ - projectile.position.z) * t;
+                        
+                        if (base.isPointCollidingWithWalls(checkX, checkZ) && !base.isPointNearGate(checkX, checkZ)) {
+                            // Calculate exact collision point for impact effect
+                            const collisionPoint = new THREE.Vector3(
+                                checkX,
+                                projectile.position.y,
+                                checkZ
+                            );
+                            this.createImpactEffect(collisionPoint);
+                            this.scene.remove(projectile);
+                            this.projectiles.splice(i, 1);
+                            hitBaseWall = true;
+                            break;
+                        }
+                    }
+                    if (hitBaseWall) break;
                 }
 
                 if (hitBaseWall) {
@@ -354,22 +419,36 @@ export class Tank {
     }
 
     createImpactEffect(position) {
-        // Create impact flash
+        // Create double-sided impact flash
         const impactGeometry = new THREE.SphereGeometry(0.3);
         const impactMaterial = new THREE.MeshBasicMaterial({
             color: 0xffff00,
             transparent: true,
-            opacity: 1
+            opacity: 1,
+            side: THREE.DoubleSide
         });
-        const impact = new THREE.Mesh(impactGeometry, impactMaterial);
-        impact.position.copy(position);
-
-        // Add impact light
-        const impactLight = new THREE.PointLight(0xffff00, 2, 5);
-        impactLight.position.copy(position);
         
-        this.scene.add(impact);
-        this.scene.add(impactLight);
+        // Create two impact meshes, slightly offset on both sides of the wall
+        const impactFront = new THREE.Mesh(impactGeometry, impactMaterial);
+        const impactBack = new THREE.Mesh(impactGeometry, impactMaterial);
+        
+        // Position impacts slightly offset from the collision point
+        const offset = 0.1; // Small offset to prevent z-fighting
+        impactFront.position.copy(position);
+        impactBack.position.copy(position);
+        
+        // Add impacts to scene
+        this.scene.add(impactFront);
+        this.scene.add(impactBack);
+
+        // Add impact lights on both sides
+        const impactLightFront = new THREE.PointLight(0xffff00, 2, 5);
+        const impactLightBack = new THREE.PointLight(0xffff00, 2, 5);
+        impactLightFront.position.copy(position);
+        impactLightBack.position.copy(position);
+        
+        this.scene.add(impactLightFront);
+        this.scene.add(impactLightBack);
 
         // Animate and remove impact effect
         const startTime = Date.now();
@@ -381,13 +460,25 @@ export class Tank {
             
             if (age < duration) {
                 const fadeRatio = 1 - age / duration;
-                impact.material.opacity = fadeRatio;
-                impactLight.intensity = 2 * fadeRatio;
-                impact.scale.set(1 + age/duration, 1 + age/duration, 1 + age/duration);
+                const scale = 1 + age/duration;
+                
+                // Update both impacts
+                [impactFront, impactBack].forEach(impact => {
+                    impact.material.opacity = fadeRatio;
+                    impact.scale.set(scale, scale, scale);
+                });
+                
+                // Update both lights
+                impactLightFront.intensity = 2 * fadeRatio;
+                impactLightBack.intensity = 2 * fadeRatio;
+                
                 requestAnimationFrame(animate);
             } else {
-                this.scene.remove(impact);
-                this.scene.remove(impactLight);
+                // Remove all elements
+                this.scene.remove(impactFront);
+                this.scene.remove(impactBack);
+                this.scene.remove(impactLightFront);
+                this.scene.remove(impactLightBack);
             }
         };
 
@@ -503,6 +594,12 @@ export class Tank {
         // Tank movement with boundary checks
         const mapBoundary = 450 - 4; // Half map size minus wall thickness and some margin
         
+        // Tank dimensions (based on hull size plus tracks)
+        const tankWidth = 4.0;  // Full width including tracks
+        const tankLength = 5.4; // Full length including front slope
+        const tankHalfWidth = tankWidth / 2;
+        const tankHalfLength = tankLength / 2;
+        
         if (this.keys.w) {
             nextX = this.body.position.x + Math.sin(this.body.rotation.y) * this.speed;
             nextZ = this.body.position.z + Math.cos(this.body.rotation.y) * this.speed;
@@ -523,11 +620,49 @@ export class Tank {
                 }
             });
 
-            // Check collision with each base's walls
+            // Calculate tank corners in world space for the next position
+            const angle = this.body.rotation.y;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            
+            // Define tank corner points (clockwise from front-right)
+            const cornerPoints = [
+                { // Front-right
+                    x: nextX + (tankHalfLength * sin + tankHalfWidth * cos),
+                    z: nextZ + (tankHalfLength * cos - tankHalfWidth * sin)
+                },
+                { // Back-right
+                    x: nextX + (-tankHalfLength * sin + tankHalfWidth * cos),
+                    z: nextZ + (-tankHalfLength * cos - tankHalfWidth * sin)
+                },
+                { // Back-left
+                    x: nextX + (-tankHalfLength * sin - tankHalfWidth * cos),
+                    z: nextZ + (-tankHalfLength * cos + tankHalfWidth * sin)
+                },
+                { // Front-left
+                    x: nextX + (tankHalfLength * sin - tankHalfWidth * cos),
+                    z: nextZ + (tankHalfLength * cos + tankHalfWidth * sin)
+                }
+            ];
+
+            // Check collision for each corner point
             for (const base of bases) {
-                if (base.isPointCollidingWithWalls(nextX, nextZ)) {
-                    // Only allow movement if we're near a gate
-                    if (!base.isPointNearGate(nextX, nextZ)) {
+                for (const corner of cornerPoints) {
+                    if (base.isPointCollidingWithWalls(corner.x, corner.z)) {
+                        // Only allow movement if all corners are near a gate
+                        if (!base.isPointNearGate(corner.x, corner.z)) {
+                            canMove = false;
+                            break;
+                        }
+                    }
+                }
+                if (!canMove) break;
+            }
+
+            // Also check map boundaries for all corners
+            if (canMove) {
+                for (const corner of cornerPoints) {
+                    if (Math.abs(corner.x) >= mapBoundary || Math.abs(corner.z) >= mapBoundary) {
                         canMove = false;
                         break;
                     }

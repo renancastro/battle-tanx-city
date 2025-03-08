@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { Tank } from './Tank.js';
 import { Base } from './Base.js';
 import { Road } from './Road.js';
+import { Building } from './Building.js';
+import { UI } from './UI.js';
 
 // Game state
 const keys = {
@@ -10,6 +12,9 @@ const keys = {
     a: false,
     d: false
 };
+
+// Initialize UI
+const ui = new UI();
 
 // Tank properties
 const tankSpeed = 1.0;
@@ -214,7 +219,7 @@ function generateBases() {
     new Base(scene, baseOffset, baseOffset);    // Top-right
 }
 
-// City generation with main road
+// City generation with roads and buildings
 function generateCity() {
     // Create bases first
     generateBases();
@@ -222,6 +227,97 @@ function generateCity() {
     // Create road grid
     const roadSystem = new Road(scene);
     roadSystem.createRoadGrid();
+
+    // Add buildings along roads
+    const mapSize = 900;
+    const wallThickness = 4;
+    const safeDistance = 15; // Distance from walls to prevent overlap
+    const mapLimit = mapSize/2 - wallThickness - safeDistance;
+    
+    const gridSize = 4; // Same as in Road class
+    const spacing = (mapSize - 20) / (gridSize - 1);
+    const roadWidth = 12; // Same as in Road class
+    const buildingOffset = roadWidth + 15; // Distance from road center to building (road width + gap)
+    const baseOffset = 380; // Same as in generateBases
+    const baseSize = 100; // Safe distance from bases
+    const buildingSpacing = 50; // Space between buildings
+
+    // Helper function to check if position is too close to bases
+    function isTooCloseToBase(x, z) {
+        const bases = [
+            { x: -baseOffset, z: -baseOffset },
+            { x: -baseOffset, z: baseOffset },
+            { x: baseOffset, z: -baseOffset },
+            { x: baseOffset, z: baseOffset }
+        ];
+
+        return bases.some(base => 
+            Math.abs(x - base.x) < baseSize && 
+            Math.abs(z - base.z) < baseSize
+        );
+    }
+
+    // Helper function to check if position is within map bounds
+    function isWithinMapBounds(x, z) {
+        return Math.abs(x) <= mapLimit && Math.abs(z) <= mapLimit;
+    }
+
+    // Helper function to check if position is near any road
+    function isNearRoad(x, z) {
+        // Check horizontal roads
+        for (let i = 0; i < gridSize; i++) {
+            const roadZ = -mapSize/2 + i * spacing;
+            if (Math.abs(z - roadZ) < roadWidth/2) return true;
+        }
+        // Check vertical roads
+        for (let i = 0; i < gridSize; i++) {
+            const roadX = -mapSize/2 + i * spacing;
+            if (Math.abs(x - roadX) < roadWidth/2) return true;
+        }
+        return false;
+    }
+
+    // Place buildings along horizontal roads
+    for (let i = 0; i < gridSize; i++) {
+        const z = -mapSize/2 + i * spacing;
+        for (let x = -mapLimit + buildingSpacing; x < mapLimit - buildingSpacing; x += buildingSpacing) {
+            // Place buildings on both sides of the road
+            [-buildingOffset, buildingOffset].forEach(offset => {
+                const buildingZ = z + offset;
+                const randomOffset = (Math.random() - 0.5) * 5; // Reduced random offset
+                const finalX = x + randomOffset;
+                const finalZ = buildingZ;
+                
+                // Check if position is valid
+                if (!isTooCloseToBase(finalX, finalZ) && 
+                    isWithinMapBounds(finalX, finalZ) && 
+                    !isNearRoad(finalX, finalZ)) {
+                    new Building(scene, finalX, finalZ);
+                }
+            });
+        }
+    }
+
+    // Place buildings along vertical roads
+    for (let i = 0; i < gridSize; i++) {
+        const x = -mapSize/2 + i * spacing;
+        for (let z = -mapLimit + buildingSpacing; z < mapLimit - buildingSpacing; z += buildingSpacing) {
+            // Place buildings on both sides of the road
+            [-buildingOffset, buildingOffset].forEach(offset => {
+                const buildingX = x + offset;
+                const randomOffset = (Math.random() - 0.5) * 5; // Reduced random offset
+                const finalX = buildingX;
+                const finalZ = z + randomOffset;
+                
+                // Check if position is valid
+                if (!isTooCloseToBase(finalX, finalZ) && 
+                    isWithinMapBounds(finalX, finalZ) && 
+                    !isNearRoad(finalX, finalZ)) {
+                    new Building(scene, finalX, finalZ);
+                }
+            });
+        }
+    }
 }
 
 // Create boundary walls around the map
