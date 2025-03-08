@@ -169,13 +169,39 @@ export class Tank {
                 const nextX = projectile.position.x + projectile.userData.velocity.x;
                 const nextZ = projectile.position.z + projectile.userData.velocity.z;
 
-                // Check for wall collision
+                // Check for map boundary wall collision
                 if (Math.abs(nextX) >= mapBoundary || Math.abs(nextZ) >= mapBoundary) {
                     // Create impact effect
                     this.createImpactEffect(projectile.position);
                     // Remove projectile
                     this.scene.remove(projectile);
                     this.projectiles.splice(i, 1);
+                    continue;
+                }
+
+                // Get all bases from the scene
+                const bases = [];
+                this.scene.traverse((object) => {
+                    if (object.type === 'Group' && object.userData.isBase) {
+                        bases.push(object.userData.baseInstance);
+                    }
+                });
+
+                // Check collision with each base's walls
+                let hitBaseWall = false;
+                for (const base of bases) {
+                    if (base.isPointCollidingWithWalls(nextX, nextZ) && !base.isPointNearGate(nextX, nextZ)) {
+                        // Create impact effect
+                        this.createImpactEffect(projectile.position);
+                        // Remove projectile
+                        this.scene.remove(projectile);
+                        this.projectiles.splice(i, 1);
+                        hitBaseWall = true;
+                        break;
+                    }
+                }
+
+                if (hitBaseWall) {
                     continue;
                 }
 
@@ -271,10 +297,33 @@ export class Tank {
             nextZ = this.body.position.z - Math.cos(this.body.rotation.y) * this.speed;
         }
 
-        // Only update position if within bounds
+        // Check collisions with base walls
+        let canMove = true;
         if (Math.abs(nextX) < mapBoundary && Math.abs(nextZ) < mapBoundary) {
-            this.body.position.x = nextX;
-            this.body.position.z = nextZ;
+            // Get all bases from the scene
+            const bases = [];
+            this.scene.traverse((object) => {
+                if (object.type === 'Group' && object.userData.isBase) {
+                    bases.push(object.userData.baseInstance);
+                }
+            });
+
+            // Check collision with each base's walls
+            for (const base of bases) {
+                if (base.isPointCollidingWithWalls(nextX, nextZ)) {
+                    // Only allow movement if we're near a gate
+                    if (!base.isPointNearGate(nextX, nextZ)) {
+                        canMove = false;
+                        break;
+                    }
+                }
+            }
+
+            // Update position if no collision
+            if (canMove) {
+                this.body.position.x = nextX;
+                this.body.position.z = nextZ;
+            }
         }
 
         // Tank rotation

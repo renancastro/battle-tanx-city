@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Tank } from './Tank.js';
+import { Base } from './Base.js';
 
 // Game state
 const keys = {
@@ -94,7 +95,6 @@ function createGrid() {
 
     // Create vertical lines
     for (let x = -gridSize/2; x <= gridSize/2; x += blockSize) {
-        // For each vertical line, we might need multiple segments
         let currentLine = [];
         for (let z = -gridSize/2; z <= gridSize/2; z += blockSize) {
             if (!isInBaseArea(x, z)) {
@@ -109,7 +109,6 @@ function createGrid() {
                 currentLine = [];
             }
         }
-        // Don't forget to draw the last segment if it exists
         if (currentLine.length === 1) {
             currentLine.push(new THREE.Vector3(x, 0.1, gridSize/2));
             const geometry = new THREE.BufferGeometry().setFromPoints(currentLine);
@@ -120,7 +119,6 @@ function createGrid() {
 
     // Create horizontal lines
     for (let z = -gridSize/2; z <= gridSize/2; z += blockSize) {
-        // For each horizontal line, we might need multiple segments
         let currentLine = [];
         for (let x = -gridSize/2; x <= gridSize/2; x += blockSize) {
             if (!isInBaseArea(x, z)) {
@@ -135,7 +133,6 @@ function createGrid() {
                 currentLine = [];
             }
         }
-        // Don't forget to draw the last segment if it exists
         if (currentLine.length === 1) {
             currentLine.push(new THREE.Vector3(gridSize/2, 0.1, z));
             const geometry = new THREE.BufferGeometry().setFromPoints(currentLine);
@@ -205,162 +202,15 @@ function createGrid() {
 
 createGrid();
 
-// Create tank bases in corners
-function createTankBase(x, z) {
-    const baseGroup = new THREE.Group();
-
-    // Main platform
-    const baseGeometry = new THREE.BoxGeometry(30, 1, 30);
-    const baseMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x505050,  // Darker than ground
-        roughness: 0.7,
-        metalness: 0.3
-    });
-    const base = new THREE.Mesh(baseGeometry, baseMaterial);
-    base.position.y = 0.5; // Half height to sit on ground
-    base.castShadow = true;
-    base.receiveShadow = true;
-    baseGroup.add(base);
-
-    // Add border/rim
-    const rimGeometry = new THREE.BoxGeometry(33, 0.5, 33);
-    const rimMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x404040,  // Even darker for contrast
-        roughness: 0.8,
-        metalness: 0.2
-    });
-    const rim = new THREE.Mesh(rimGeometry, rimMaterial);
-    rim.position.y = 0.25; // Place at bottom of platform
-    rim.castShadow = true;
-    rim.receiveShadow = true;
-    baseGroup.add(rim);
-
-    // Add colored squares around base
-    const squareSize = 40; // Size of each adjacent square
-    const squareGeometry = new THREE.PlaneGeometry(squareSize, squareSize);
-    const squareMaterial = new THREE.MeshStandardMaterial({
-        color: 0x606060,  // Slightly lighter than base
-        roughness: 0.8,
-        metalness: 0.2
-    });
-
-    // Define sizes for walls and pillars
-    const pillarSize = 3;
-    const wallHeight = 5;
-    const wallThickness = 2;
-    const pillarHeight = wallHeight + 1;
-
-    // Create 8 adjacent squares
-    const squarePositions = [
-        { x: -squareSize, z: 0 },      // Left
-        { x: squareSize, z: 0 },       // Right
-        { x: 0, z: -squareSize },      // Bottom
-        { x: 0, z: squareSize },       // Top
-        { x: -squareSize, z: -squareSize }, // Bottom-left
-        { x: squareSize, z: -squareSize },  // Bottom-right
-        { x: -squareSize, z: squareSize },  // Top-left
-        { x: squareSize, z: squareSize }    // Top-right
-    ];
-
-    squarePositions.forEach(pos => {
-        const square = new THREE.Mesh(squareGeometry, squareMaterial);
-        square.rotation.x = -Math.PI / 2; // Lay flat
-        square.position.set(pos.x, 0.05, pos.z); // Slightly above ground
-        square.receiveShadow = true;
-        baseGroup.add(square);
-    });
-
-    // Add walls around the perimeter
-    const wallMaterial = new THREE.MeshStandardMaterial({
-        color: 0x606060,
-        roughness: 0.6,
-        metalness: 0.4
-    });
-
-    // Define wall points for the outer perimeter (relative to base position)
-    const wallPoints = [
-        { x: -squareSize - squareSize/2, z: -squareSize - squareSize/2 }, // Bottom-left
-        { x: squareSize + squareSize/2, z: -squareSize - squareSize/2 },  // Bottom-right
-        { x: squareSize + squareSize/2, z: squareSize + squareSize/2 },   // Top-right
-        { x: -squareSize - squareSize/2, z: squareSize + squareSize/2 }   // Top-left
-    ];
-
-    // Create walls between pillars
-    for (let i = 0; i < 4; i++) {
-        const start = wallPoints[i];
-        const end = wallPoints[(i + 1) % 4];
-        
-        // Calculate wall length and position
-        const length = Math.sqrt(
-            Math.pow(end.x - start.x, 2) + 
-            Math.pow(end.z - start.z, 2)
-        ) - pillarSize; // Subtract pillar size to connect exactly to pillars
-        
-        // Calculate position to account for pillar offset
-        const direction = {
-            x: end.x - start.x,
-            z: end.z - start.z
-        };
-        const distance = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
-        const normalized = {
-            x: direction.x / distance,
-            z: direction.z / distance
-        };
-        
-        const centerX = start.x + direction.x / 2;
-        const centerZ = start.z + direction.z / 2;
-        
-        // Calculate rotation
-        const rotation = Math.atan2(direction.z, direction.x);
-
-        const wallGeometry = new THREE.BoxGeometry(length, wallHeight, wallThickness);
-        const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-        
-        wall.position.set(
-            centerX,
-            wallHeight/2,
-            centerZ
-        );
-        wall.rotation.y = rotation;
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        baseGroup.add(wall);
-    }
-
-    // Add corner pillars
-    const pillarGeometry = new THREE.BoxGeometry(pillarSize, pillarHeight, pillarSize);
-    const pillarMaterial = new THREE.MeshStandardMaterial({
-        color: 0x505050,
-        roughness: 0.7,
-        metalness: 0.3
-    });
-
-    wallPoints.forEach(point => {
-        const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
-        pillar.position.set(
-            point.x,
-            pillarHeight/2,
-            point.z
-        );
-        pillar.castShadow = true;
-        pillar.receiveShadow = true;
-        baseGroup.add(pillar);
-    });
-
-    baseGroup.position.set(x, 0, z);
-    scene.add(baseGroup);
-}
-
 // Generate tank bases in corners
 function generateBases() {
-    const mapSize = 900;
     const baseOffset = 380; // Increased distance from center to base center
 
     // Create bases in each corner
-    createTankBase(-baseOffset, -baseOffset);  // Bottom-left
-    createTankBase(-baseOffset, baseOffset);   // Top-left
-    createTankBase(baseOffset, -baseOffset);   // Bottom-right
-    createTankBase(baseOffset, baseOffset);    // Top-right
+    new Base(scene, -baseOffset, -baseOffset);  // Bottom-left
+    new Base(scene, -baseOffset, baseOffset);   // Top-left
+    new Base(scene, baseOffset, -baseOffset);   // Bottom-right
+    new Base(scene, baseOffset, baseOffset);    // Top-right
 }
 
 // Empty city generation (keeping the function for future use if needed)
