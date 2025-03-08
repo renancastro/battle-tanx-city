@@ -350,6 +350,14 @@ export class Tank {
     }
 
     getPosition() {
-        return this.body.position;
+        return {
+            x: this.body.position.x,
+            y: this.body.position.y,
+            z: this.body.position.z
+        };
+    }
+
+    getRotation() {
+        return this.body.rotation.y;
     }
 } 

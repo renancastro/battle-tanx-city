@@ -290,14 +290,19 @@ createBoundaryWalls();
 const tank = new Tank(scene);
 
 // Camera setup
-camera.position.set(0, 10, -10);
+camera.position.set(0, 15, 15); // Reduced initial z distance from 20 to 15
 camera.lookAt(tank.getPosition());
 
 // Camera controls
 const cameraSettings = {
-    minHeight: 5,
-    maxHeight: 20,
-    scrollSpeed: 0.5
+    minHeight: 2,      // Keep minimum height the same
+    maxHeight: 50,     // Keep maximum height the same
+    scrollSpeed: 1,    // Keep scroll speed the same
+    distance: 15,      // Reduced default distance from 20 to 15
+    currentHeight: 15, // Keep initial height the same
+    minDistance: 3,    // Reduced minimum distance from 5 to 3
+    rotationLag: 0.1,  // Keep rotation lag the same
+    currentRotation: 0 // Keep rotation tracking
 };
 
 // Mouse movement
@@ -313,9 +318,18 @@ function onMouseWheel(event) {
     // Adjust camera height based on scroll direction
     const delta = Math.sign(event.deltaY) * cameraSettings.scrollSpeed;
     const newHeight = Math.max(cameraSettings.minHeight, 
-                             Math.min(cameraSettings.maxHeight, 
-                                    camera.position.y + delta));
-    camera.position.y = newHeight;
+                          Math.min(cameraSettings.maxHeight, 
+                                 cameraSettings.currentHeight + delta));
+    
+    // Adjust distance based on height to maintain good viewing angle
+    if (newHeight < 5) {
+        cameraSettings.distance = Math.max(cameraSettings.minDistance, 
+                                         cameraSettings.distance - Math.abs(delta));
+    } else if (cameraSettings.distance < 15) { // Changed from 20 to 15
+        cameraSettings.distance = Math.min(15, cameraSettings.distance + Math.abs(delta));
+    }
+    
+    cameraSettings.currentHeight = newHeight;
 }
 
 function onMouseDown(event) {
@@ -367,13 +381,32 @@ function animate() {
     // Update tank
     tank.update(ground, mouse, raycaster, camera);
 
-    // Update camera position with larger offset
+    // Update camera position to follow behind tank
     const tankPos = tank.getPosition();
-    camera.position.x = tankPos.x;
-    camera.position.z = tankPos.z - 20; // Increased camera distance
-    camera.lookAt(tankPos);
+    const tankRotation = tank.getRotation();
+    
+    // Smoothly interpolate camera rotation
+    const rotationDiff = tankRotation - cameraSettings.currentRotation;
+    
+    // Handle rotation wrap-around
+    if (rotationDiff > Math.PI) {
+        cameraSettings.currentRotation += Math.PI * 2;
+    } else if (rotationDiff < -Math.PI) {
+        cameraSettings.currentRotation -= Math.PI * 2;
+    }
+    
+    cameraSettings.currentRotation += rotationDiff * cameraSettings.rotationLag;
+    
+    // Calculate camera position using interpolated rotation
+    camera.position.x = tankPos.x - Math.sin(cameraSettings.currentRotation) * cameraSettings.distance;
+    camera.position.z = tankPos.z - Math.cos(cameraSettings.currentRotation) * cameraSettings.distance;
+    camera.position.y = cameraSettings.currentHeight;
 
-    // Update directional light position relative to tank with larger offset
+    // Adjust look-at point based on height
+    const lookAtHeight = Math.max(0.5, cameraSettings.currentHeight * 0.1);
+    camera.lookAt(new THREE.Vector3(tankPos.x, tankPos.y + lookAtHeight, tankPos.z));
+
+    // Update directional light position relative to tank
     directionalLight.position.set(
         tankPos.x + 20,
         50,
@@ -384,4 +417,49 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-animate(); 
+animate();
+
+// Create controls overlay
+function createControlsOverlay() {
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '20px';
+    overlay.style.left = '20px';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    overlay.style.padding = '15px';
+    overlay.style.borderRadius = '8px';
+    overlay.style.color = 'white';
+    overlay.style.fontFamily = 'Arial, sans-serif';
+    overlay.style.fontSize = '14px';
+    overlay.style.zIndex = '1000';
+    overlay.style.userSelect = 'none';
+    overlay.style.pointerEvents = 'none';
+
+    const controls = [
+        'W - Move Forward',
+        'S - Move Backward',
+        'A - Rotate Left',
+        'D - Rotate Right',
+        'Mouse - Aim Turret',
+        'Left Click - Fire'
+    ];
+
+    const title = document.createElement('div');
+    title.textContent = 'Controls';
+    title.style.fontWeight = 'bold';
+    title.style.marginBottom = '8px';
+    title.style.fontSize = '16px';
+    overlay.appendChild(title);
+
+    controls.forEach(control => {
+        const div = document.createElement('div');
+        div.textContent = control;
+        div.style.marginBottom = '4px';
+        overlay.appendChild(div);
+    });
+
+    document.body.appendChild(overlay);
+}
+
+// Call this after scene initialization
+createControlsOverlay(); 
