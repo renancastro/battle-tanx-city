@@ -37,9 +37,26 @@ export class Tank {
     }
 
     createTank() {
+        // Tank color palette (military and camouflage colors)
+        const tankColors = [
+            0x4a5320,  // Military green
+            0x5d4a1f,  // Desert tan
+            0x3b3b3b,  // Urban grey
+            0x2d4438,  // Forest green
+            0x49443c,  // Earth brown
+            0x656d4a,  // Olive drab
+            0x544d3d,  // Khaki
+            0x3d4f2f,  // Woodland green
+            0x5b503c,  // Sand brown
+            0x3c4434   // Dark olive
+        ];
+        
+        // Randomly select a color
+        const randomColor = tankColors[Math.floor(Math.random() * tankColors.length)];
+
         // Tank materials
         const tankMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x4a5320,  // Military green
+            color: randomColor,
             roughness: 0.7,
             metalness: 0.3
         });
