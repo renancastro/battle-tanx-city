@@ -219,9 +219,9 @@ function generateCity() {
     // Create bases first
     generateBases();
     
-    // Create main road
+    // Create road grid
     const roadSystem = new Road(scene);
-    roadSystem.createMainRoad();
+    roadSystem.createRoadGrid();
 }
 
 // Create boundary walls around the map

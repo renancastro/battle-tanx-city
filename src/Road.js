@@ -29,18 +29,17 @@ export class Road {
             metalness: 0.1
         });
 
-        // Create roads
-        this.createMainRoad();
-        this.createCrossingRoad();
+        // Store road references
+        this.roads = [];
     }
 
-    createRoadSegment(length, isRotated = false) {
+    createRoadSegment(length, isRotated = false, position = { x: 0, z: 0 }) {
         const roadContainer = new THREE.Object3D();
         roadContainer.rotation.x = -Math.PI/2;
         if (isRotated) {
             roadContainer.rotation.z = Math.PI/2;
         }
-        roadContainer.position.y = 0.01;
+        roadContainer.position.set(position.x, 0.01, position.z);
         
         // Create road base
         const roadGeometry = new THREE.PlaneGeometry(length, this.roadWidth);
@@ -114,14 +113,36 @@ export class Road {
         const length = mapSize - 20; // Leave small gap from walls
         const mainRoad = this.createRoadSegment(length, false);
         this.scene.add(mainRoad);
+        this.roads.push(mainRoad);
         return mainRoad;
     }
 
-    createCrossingRoad() {
+    createRoadGrid() {
         const mapSize = 900;
         const length = mapSize - 20; // Leave small gap from walls
-        const crossRoad = this.createRoadSegment(length, true);
-        this.scene.add(crossRoad);
-        return crossRoad;
+        const gridSize = 4; // 4x4 grid creates 3x3 squares
+        const spacing = length / (gridSize - 1); // Equal spacing between roads
+
+        // Create horizontal roads
+        for (let i = 0; i < gridSize; i++) {
+            const position = {
+                x: 0,
+                z: -length/2 + i * spacing
+            };
+            const horizontalRoad = this.createRoadSegment(length, false, position);
+            this.scene.add(horizontalRoad);
+            this.roads.push(horizontalRoad);
+        }
+
+        // Create vertical roads
+        for (let i = 0; i < gridSize; i++) {
+            const position = {
+                x: -length/2 + i * spacing,
+                z: 0
+            };
+            const verticalRoad = this.createRoadSegment(length, true, position);
+            this.scene.add(verticalRoad);
+            this.roads.push(verticalRoad);
+        }
     }
 } 
