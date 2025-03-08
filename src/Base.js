@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 
 export class Base {
-    constructor(scene, x, z) {
+    constructor(scene, x, z, color = 0x505050) {
         this.scene = scene;
         this.x = x;
         this.z = z;
+        this.color = color;
         this.baseGroup = new THREE.Group();
         this.wallPoints = [];
         this.gateInfo = null;
@@ -19,7 +20,7 @@ export class Base {
         // Main platform
         const baseGeometry = new THREE.BoxGeometry(30, 1, 30);
         const baseMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x505050,  // Darker than ground
+            color: this.color,
             roughness: 0.7,
             metalness: 0.3
         });
@@ -32,7 +33,7 @@ export class Base {
         // Add border/rim
         const rimGeometry = new THREE.BoxGeometry(33, 0.5, 33);
         const rimMaterial = new THREE.MeshStandardMaterial({ 
-            color: 0x404040,  // Even darker for contrast
+            color: this.color,
             roughness: 0.8,
             metalness: 0.2
         });
@@ -46,7 +47,7 @@ export class Base {
         const squareSize = 40; // Size of each adjacent square
         const squareGeometry = new THREE.PlaneGeometry(squareSize, squareSize);
         const squareMaterial = new THREE.MeshStandardMaterial({
-            color: 0x606060,  // Slightly lighter than base
+            color: this.color,
             roughness: 0.8,
             metalness: 0.2
         });
@@ -80,7 +81,7 @@ export class Base {
 
         // Add walls around the perimeter
         const wallMaterial = new THREE.MeshStandardMaterial({
-            color: 0x606060,
+            color: this.color,
             roughness: 0.6,
             metalness: 0.4
         });
@@ -219,7 +220,7 @@ export class Base {
         // Add corner pillars
         const pillarGeometry = new THREE.BoxGeometry(pillarSize, pillarHeight, pillarSize);
         const pillarMaterial = new THREE.MeshStandardMaterial({
-            color: 0x505050,
+            color: this.color,
             roughness: 0.7,
             metalness: 0.3
         });

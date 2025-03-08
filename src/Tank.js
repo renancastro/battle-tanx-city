@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 
 export class Tank {
-    constructor(scene) {
+    constructor(scene, audioManager) {
         // Tank properties
-        this.speed = 1.0;
-        this.rotationSpeed = 0.15;
-        this.turretRotationSpeed = 0.1;
+        this.speed = 4.0;
+        this.rotationSpeed = 0.4;
+        this.turretRotationSpeed = 0.2;
+        
+        // Audio system
+        this.audioManager = audioManager;
         
         // Health system
         this.maxHealth = 100;
@@ -18,6 +21,15 @@ export class Tank {
             a: false,
             d: false
         };
+
+        // Recoil properties
+        this.recoilAmount = 0.3;
+        this.recoilDuration = 150;
+        this.recoilRecoveryDuration = 300;
+        this.isRecoiling = false;
+        this.recoilStartTime = 0;
+        this.originalCannonPosition = null;
+        this.originalTurretRotation = null;
 
         // Projectile properties
         this.projectileSpeed = 8.0;
@@ -32,32 +44,34 @@ export class Tank {
         this.lastFlashTime = 0;
 
         this.scene = scene;
+        
+        // Position tank in a random base
+        const baseOffset = 380;
+        const basePositions = [
+            { x: -baseOffset, z: -baseOffset, rotation: Math.PI / 4, color: 0xff0000 },    // Bottom-left, Red
+            { x: -baseOffset, z: baseOffset, rotation: -Math.PI / 4, color: 0x0000ff },    // Top-left, Blue
+            { x: baseOffset, z: -baseOffset, rotation: 3 * Math.PI / 4, color: 0x00ff00 }, // Bottom-right, Green
+            { x: baseOffset, z: baseOffset, rotation: -3 * Math.PI / 4, color: 0xffff00 }  // Top-right, Yellow
+        ];
+        
+        // Randomly select a base
+        const spawnBase = basePositions[Math.floor(Math.random() * basePositions.length)];
+        this.tankColor = spawnBase.color;
+        
         this.createTank();
+        
+        // Position and rotate tank to face the gate
+        this.body.position.set(spawnBase.x, 0.6, spawnBase.z);
+        this.body.rotation.y = spawnBase.rotation;
+        
         this.createHealthBar();
         this.setupEventListeners();
     }
 
     createTank() {
-        // Tank color palette (military and camouflage colors)
-        const tankColors = [
-            0x4a5320,  // Military green
-            0x5d4a1f,  // Desert tan
-            0x3b3b3b,  // Urban grey
-            0x2d4438,  // Forest green
-            0x49443c,  // Earth brown
-            0x656d4a,  // Olive drab
-            0x544d3d,  // Khaki
-            0x3d4f2f,  // Woodland green
-            0x5b503c,  // Sand brown
-            0x3c4434   // Dark olive
-        ];
-        
-        // Randomly select a color
-        const randomColor = tankColors[Math.floor(Math.random() * tankColors.length)];
-
         // Tank materials
         const tankMaterial = new THREE.MeshStandardMaterial({ 
-            color: randomColor,
+            color: this.tankColor,
             roughness: 0.7,
             metalness: 0.3
         });
@@ -216,6 +230,8 @@ export class Tank {
     }
 
     fireProjectile() {
+        if (this.isRecoiling) return; // Prevent rapid firing during recoil
+
         const projectile = new THREE.Mesh(
             new THREE.SphereGeometry(this.projectileSize),
             new THREE.MeshStandardMaterial({ 
@@ -227,6 +243,14 @@ export class Tank {
                 toneMapped: false
             })
         );
+        
+        // Store original positions for recoil
+        this.originalCannonPosition = this.cannon.position.clone();
+        this.originalTurretRotation = this.turret.rotation.x;
+        
+        // Start recoil
+        this.isRecoiling = true;
+        this.recoilStartTime = Date.now();
         
         // Position projectile at the end of the cannon
         const cannonTip = new THREE.Vector3();
@@ -250,6 +274,11 @@ export class Tank {
         
         this.scene.add(projectile);
         this.projectiles.push(projectile);
+
+        // Play cannon fire sound
+        if (this.audioManager) {
+            this.audioManager.playCannonFire(cannonTip);
+        }
 
         // Show muzzle flash
         if (!this.muzzleFlash) {
@@ -587,6 +616,43 @@ export class Tank {
     }
 
     update(ground, mouse, raycaster, camera) {
+        // Handle recoil animation
+        if (this.isRecoiling) {
+            const now = Date.now();
+            const recoilAge = now - this.recoilStartTime;
+            
+            if (recoilAge <= this.recoilDuration) {
+                // Recoil phase
+                const recoilProgress = recoilAge / this.recoilDuration;
+                const recoilOffset = Math.sin(recoilProgress * Math.PI) * this.recoilAmount;
+                
+                // Move cannon backward more significantly
+                this.cannon.position.z = this.originalCannonPosition.z - recoilOffset * 1.5;
+                
+                // Tilt turret up more noticeably
+                this.turret.rotation.x = this.originalTurretRotation - (recoilOffset * 0.3);
+                
+            } else if (recoilAge <= this.recoilDuration + this.recoilRecoveryDuration) {
+                // Recovery phase
+                const recoveryProgress = (recoilAge - this.recoilDuration) / this.recoilRecoveryDuration;
+                const smoothProgress = 1 - Math.pow(1 - recoveryProgress, 2); // Smooth easing
+                
+                // Smoothly return to original position
+                this.cannon.position.z = this.originalCannonPosition.z - 
+                    (this.recoilAmount * 1.5 * (1 - smoothProgress));
+                
+                // Smoothly return turret rotation
+                this.turret.rotation.x = this.originalTurretRotation - 
+                    (this.recoilAmount * 0.3 * (1 - smoothProgress));
+                
+            } else {
+                // Reset everything
+                this.isRecoiling = false;
+                this.cannon.position.copy(this.originalCannonPosition);
+                this.turret.rotation.x = this.originalTurretRotation;
+            }
+        }
+
         // Calculate next position before moving
         let nextX = this.body.position.x;
         let nextZ = this.body.position.z;

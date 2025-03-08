@@ -4,6 +4,7 @@ import { Base } from './Base.js';
 import { Road } from './Road.js';
 import { Building } from './Building.js';
 import { UI } from './UI.js';
+import { AudioManager } from './AudioManager.js';
 
 // Game state
 const keys = {
@@ -15,6 +16,9 @@ const keys = {
 
 // Initialize UI
 const ui = new UI();
+
+// Initialize audio system
+const audioManager = new AudioManager();
 
 // Tank properties
 const tankSpeed = 1.0;
@@ -39,6 +43,9 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
+
+// Add audio listener to camera
+camera.add(audioManager.listener);
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -212,11 +219,11 @@ createGrid();
 function generateBases() {
     const baseOffset = 380; // Increased distance from center to base center
 
-    // Create bases in each corner
-    new Base(scene, -baseOffset, -baseOffset);  // Bottom-left
-    new Base(scene, -baseOffset, baseOffset);   // Top-left
-    new Base(scene, baseOffset, -baseOffset);   // Bottom-right
-    new Base(scene, baseOffset, baseOffset);    // Top-right
+    // Create bases in each corner with their colors
+    new Base(scene, -baseOffset, -baseOffset, 0xff0000);  // Bottom-left (Red)
+    new Base(scene, -baseOffset, baseOffset, 0x0000ff);   // Top-left (Blue)
+    new Base(scene, baseOffset, -baseOffset, 0x00ff00);   // Bottom-right (Green)
+    new Base(scene, baseOffset, baseOffset, 0xffff00);    // Top-right (Yellow)
 }
 
 // City generation with roads and buildings
@@ -388,7 +395,7 @@ generateCity();
 createBoundaryWalls();
 
 // Create player tank
-const tank = new Tank(scene);
+const tank = new Tank(scene, audioManager);
 
 // Camera setup
 camera.position.set(0, 15, 15); // Reduced initial z distance from 20 to 15
@@ -476,8 +483,40 @@ window.addEventListener('resize', () => {
 });
 
 // Animation loop
+let lastTime = performance.now();
+let frameCount = 0;
+let fpsDisplayTime = 0;
+let currentFps = 0;
+
+// Create FPS display
+const fpsDisplay = document.createElement('div');
+fpsDisplay.style.position = 'fixed';
+fpsDisplay.style.top = '70px'; // Position below score display
+fpsDisplay.style.right = '20px';
+fpsDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+fpsDisplay.style.padding = '10px 20px'; // Match score display padding
+fpsDisplay.style.borderRadius = '5px'; // Match score display border radius
+fpsDisplay.style.color = '#fff';
+fpsDisplay.style.fontFamily = 'Arial, sans-serif';
+fpsDisplay.style.fontSize = '16px'; // Slightly smaller than score (24px)
+fpsDisplay.style.zIndex = '1000';
+fpsDisplay.style.userSelect = 'none';
+fpsDisplay.style.pointerEvents = 'none';
+document.body.appendChild(fpsDisplay);
+
 function animate() {
     requestAnimationFrame(animate);
+
+    // Calculate FPS
+    const currentTime = performance.now();
+    frameCount++;
+    
+    if (currentTime > fpsDisplayTime + 1000) {
+        currentFps = Math.round((frameCount * 1000) / (currentTime - fpsDisplayTime));
+        fpsDisplay.textContent = `FPS: ${currentFps}`;
+        fpsDisplayTime = currentTime;
+        frameCount = 0;
+    }
 
     // Update tank
     tank.update(ground, mouse, raycaster, camera);
