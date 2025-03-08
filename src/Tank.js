@@ -382,10 +382,40 @@ export class Tank {
 
                 if (hitBuilding) continue;
 
-                // Check collision with each base's walls with interpolation
-                let hitBaseWall = false;
+                // Check collision with each base's walls and command center
+                let hitBase = false;
                 for (const base of bases) {
-                    // Check multiple points along the projectile's path
+                    // Check if projectile hits the command center
+                    const commandCenterBounds = {
+                        minX: base.x - 8,  // Command center radius is 8
+                        maxX: base.x + 8,
+                        minZ: base.z - 8,
+                        maxZ: base.z + 8
+                    };
+
+                    if (nextX >= commandCenterBounds.minX && nextX <= commandCenterBounds.maxX &&
+                        nextZ >= commandCenterBounds.minZ && nextZ <= commandCenterBounds.maxZ) {
+                        // Calculate impact point
+                        const impactPoint = new THREE.Vector3(
+                            projectile.position.x,
+                            projectile.position.y,
+                            projectile.position.z
+                        );
+
+                        // Create impact effect
+                        this.createImpactEffect(impactPoint);
+
+                        // Deal damage to base
+                        base.takeDamage(50);  // Bases take more damage than buildings
+
+                        // Remove projectile
+                        this.scene.remove(projectile);
+                        this.projectiles.splice(i, 1);
+                        hitBase = true;
+                        break;
+                    }
+
+                    // Check multiple points along the projectile's path for wall collisions
                     const steps = 5; // Number of interpolation steps
                     for (let step = 0; step <= steps; step++) {
                         const t = step / steps;
@@ -400,18 +430,20 @@ export class Tank {
                                 checkZ
                             );
                             this.createImpactEffect(collisionPoint);
+
+                            // Deal reduced damage to base when hitting walls
+                            base.takeDamage(25);  // Walls take less damage than direct hits
+
                             this.scene.remove(projectile);
                             this.projectiles.splice(i, 1);
-                            hitBaseWall = true;
+                            hitBase = true;
                             break;
                         }
                     }
-                    if (hitBaseWall) break;
+                    if (hitBase) break;
                 }
 
-                if (hitBaseWall) {
-                    continue;
-                }
+                if (hitBase) continue;
 
                 // Update position if no collision
                 projectile.position.x = nextX;

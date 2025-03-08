@@ -235,7 +235,20 @@ function generateCity() {
     const roadSystem = new Road(scene);
     roadSystem.createRoadGrid();
 
-    // Add buildings along roads
+    // Add military buildings in strategic locations
+    const militaryBuildings = [
+        { type: 'military_airport', x: -200, z: 0 },      // West side
+        { type: 'military_barracks', x: 0, z: -200 },     // South side
+        { type: 'military_control_tower', x: 200, z: 0 },  // East side
+        { type: 'military_factory', x: 0, z: 200 },       // North side
+        { type: 'military_science', x: 0, z: 0 }          // Center
+    ];
+
+    militaryBuildings.forEach(building => {
+        new Building(scene, building.x, building.z, building.type);
+    });
+
+    // Add regular buildings along roads
     const mapSize = 900;
     const wallThickness = 4;
     const safeDistance = 15; // Distance from walls to prevent overlap

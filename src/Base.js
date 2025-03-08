@@ -9,14 +9,32 @@ export class Base {
         this.baseGroup = new THREE.Group();
         this.wallPoints = [];
         this.gateInfo = null;
+        
+        // Command center properties
+        this.maxHealth = 1000;
+        this.currentHealth = this.maxHealth;
+        this.destroyed = false;
+        
         this.createBase();
-    }
-
-    createBase() {
+        this.createCommandCenter();
+        
         // Store reference to this base instance
         this.baseGroup.userData.isBase = true;
         this.baseGroup.userData.baseInstance = this;
 
+        // Dispatch initial health state
+        window.dispatchEvent(new CustomEvent('baseHealthChanged', {
+            detail: {
+                x: this.x,
+                z: this.z,
+                color: this.color,
+                health: this.currentHealth,
+                maxHealth: this.maxHealth
+            }
+        }));
+    }
+
+    createBase() {
         // Main platform
         const baseGeometry = new THREE.BoxGeometry(30, 1, 30);
         const baseMaterial = new THREE.MeshStandardMaterial({ 
@@ -239,6 +257,200 @@ export class Base {
 
         this.baseGroup.position.set(this.x, 0, this.z);
         this.scene.add(this.baseGroup);
+    }
+
+    createCommandCenter() {
+        const materials = {
+            main: new THREE.MeshStandardMaterial({ 
+                color: this.color,
+                roughness: 0.4,
+                metalness: 0.6
+            }),
+            details: new THREE.MeshStandardMaterial({ 
+                color: 0x333333,
+                roughness: 0.7,
+                metalness: 0.3
+            }),
+            glow: new THREE.MeshStandardMaterial({ 
+                color: this.color,
+                emissive: this.color,
+                emissiveIntensity: 0.5,
+                roughness: 0.3,
+                metalness: 0.8
+            })
+        };
+
+        // Main structure - hexagonal prism
+        const hexGeometry = new THREE.CylinderGeometry(8, 8, 15, 6);
+        this.commandCenter = new THREE.Mesh(hexGeometry, materials.main);
+        this.commandCenter.position.set(0, 7.5, 0);
+        this.commandCenter.castShadow = true;
+        this.commandCenter.receiveShadow = true;
+        this.baseGroup.add(this.commandCenter);
+
+        // Top dome
+        const domeGeometry = new THREE.SphereGeometry(6, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+        const dome = new THREE.Mesh(domeGeometry, materials.main);
+        dome.position.y = 15;
+        this.commandCenter.add(dome);
+
+        // Energy ring
+        const ringGeometry = new THREE.TorusGeometry(7, 0.5, 16, 32);
+        const ring = new THREE.Mesh(ringGeometry, materials.glow);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.y = 12;
+        this.commandCenter.add(ring);
+
+        // Support pillars
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            const pillarGeometry = new THREE.BoxGeometry(1, 15, 1);
+            const pillar = new THREE.Mesh(pillarGeometry, materials.details);
+            pillar.position.set(
+                Math.cos(angle) * 7,
+                0,
+                Math.sin(angle) * 7
+            );
+            this.commandCenter.add(pillar);
+        }
+    }
+
+    takeDamage(amount) {
+        if (this.destroyed) return;
+        
+        this.currentHealth = Math.max(0, this.currentHealth - amount);
+        
+        // Update command center appearance based on damage
+        const healthPercent = this.currentHealth / this.maxHealth;
+        this.commandCenter.material.emissiveIntensity = healthPercent * 0.5;
+        
+        // Dispatch event for UI update
+        const event = new CustomEvent('baseHealthChanged', {
+            detail: {
+                x: this.x,
+                z: this.z,
+                color: this.color,
+                health: this.currentHealth,
+                maxHealth: this.maxHealth
+            }
+        });
+        window.dispatchEvent(event);
+
+        if (this.currentHealth <= 0) {
+            this.destroy();
+        }
+    }
+
+    destroy() {
+        if (this.destroyed) return;
+        
+        this.destroyed = true;
+        
+        // Create large explosion effect
+        const particleCount = 200;
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+        const baseColor = new THREE.Color(this.color);
+        const velocities = [];
+        const scales = [];
+        
+        // Create particles in a sphere around the command center
+        for (let i = 0; i < particleCount; i++) {
+            const radius = Math.random() * 20; // Larger radius for bigger explosion
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.random() * Math.PI;
+            
+            positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+            positions[i * 3 + 1] = radius * Math.cos(phi) + 10; // Start higher up
+            positions[i * 3 + 2] = radius * Math.sin(phi) * Math.sin(theta);
+            
+            colors[i * 3] = baseColor.r;
+            colors[i * 3 + 1] = baseColor.g;
+            colors[i * 3 + 2] = baseColor.b;
+
+            // Add random velocities for more dynamic explosion
+            velocities.push({
+                x: (Math.random() - 0.5) * 0.5,
+                y: Math.random() * 0.5,
+                z: (Math.random() - 0.5) * 0.5
+            });
+            
+            scales.push(Math.random() * 2 + 1);
+        }
+        
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        
+        const material = new THREE.PointsMaterial({
+            size: 2,
+            vertexColors: true,
+            transparent: true,
+            opacity: 1,
+            emissive: this.color,
+            emissiveIntensity: 1
+        });
+        
+        const particles = new THREE.Points(geometry, material);
+        particles.position.copy(this.commandCenter.position);
+        particles.position.add(this.baseGroup.position); // Add base position offset
+        this.scene.add(particles);
+
+        // Add explosion light
+        const light = new THREE.PointLight(this.color, 10, 50);
+        light.position.copy(particles.position);
+        this.scene.add(light);
+        
+        // Remove command center immediately
+        this.baseGroup.remove(this.commandCenter);
+        
+        // Animate explosion
+        const startTime = Date.now();
+        const duration = 3000; // Longer duration for more dramatic effect
+        
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = elapsed / duration;
+            
+            if (progress < 1) {
+                const positions = particles.geometry.attributes.position.array;
+                
+                // Update particle positions with gravity and spread
+                for (let i = 0; i < particleCount; i++) {
+                    const i3 = i * 3;
+                    positions[i3] += velocities[i].x;
+                    positions[i3 + 1] += velocities[i].y;
+                    positions[i3 + 2] += velocities[i].z;
+                    
+                    // Add gravity effect
+                    velocities[i].y -= 0.01;
+                }
+                
+                particles.geometry.attributes.position.needsUpdate = true;
+                
+                // Fade out particles and light
+                material.opacity = 1 - progress;
+                light.intensity = 10 * (1 - progress);
+                
+                requestAnimationFrame(animate);
+            } else {
+                // Remove explosion effects
+                this.scene.remove(particles);
+                this.scene.remove(light);
+            }
+        };
+        
+        animate();
+        
+        // Dispatch event for scoring
+        const event = new CustomEvent('baseDestroyed', {
+            detail: { 
+                x: this.x, 
+                z: this.z,
+                color: this.color
+            }
+        });
+        window.dispatchEvent(event);
     }
 
     // Helper method to check if a point is within this base's area

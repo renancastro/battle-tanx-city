@@ -1,20 +1,189 @@
 import * as THREE from 'three';
 
 export class Building {
-    constructor(scene, x, z) {
+    constructor(scene, x, z, type = 'regular') {
         this.scene = scene;
         this.x = x;
         this.z = z;
-        this.maxHealth = 400;
+        this.type = type;
+        this.maxHealth = type === 'military' ? 600 : 400;  // Military buildings are tougher
         this.currentHealth = this.maxHealth;
         this.destroyed = false;
         this.buildingGroup = new THREE.Group();
+        this.buildingGroup.userData.isBuilding = true;
+        this.buildingGroup.userData.buildingInstance = this;
         this.damageLevel = 0;
         this.createBuilding();
-        this.createHealthBar();
     }
 
     createBuilding() {
+        switch(this.type) {
+            case 'military_airport':
+                this.createMilitaryAirport();
+                break;
+            case 'military_barracks':
+                this.createMilitaryBarracks();
+                break;
+            case 'military_control_tower':
+                this.createControlTower();
+                break;
+            case 'military_factory':
+                this.createMilitaryFactory();
+                break;
+            case 'military_science':
+                this.createScienceFacility();
+                break;
+            default:
+                this.createRegularBuilding();
+        }
+
+        // Position the building
+        this.buildingGroup.position.set(this.x, 0, this.z);
+        this.scene.add(this.buildingGroup);
+    }
+
+    createMilitaryAirport() {
+        const materials = {
+            main: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.7 }),
+            runway: new THREE.MeshStandardMaterial({ color: 0x202020, roughness: 0.9 }),
+            details: new THREE.MeshStandardMaterial({ color: 0x707070, roughness: 0.5 })
+        };
+
+        // Main terminal building
+        const terminal = new THREE.Mesh(
+            new THREE.BoxGeometry(15, 8, 20),
+            materials.main
+        );
+        terminal.position.y = 4;
+        this.buildingGroup.add(terminal);
+
+        // Runway
+        const runway = new THREE.Mesh(
+            new THREE.BoxGeometry(40, 0.5, 10),
+            materials.runway
+        );
+        runway.position.set(20, 0.25, 0);
+        this.buildingGroup.add(runway);
+
+        // Control tower
+        const tower = new THREE.Mesh(
+            new THREE.CylinderGeometry(2, 2, 15, 8),
+            materials.details
+        );
+        tower.position.set(-5, 7.5, -8);
+        this.buildingGroup.add(tower);
+    }
+
+    createMilitaryBarracks() {
+        const materials = {
+            walls: new THREE.MeshStandardMaterial({ color: 0x606060, roughness: 0.8 }),
+            roof: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.7 })
+        };
+
+        // Multiple barrack buildings
+        for (let i = 0; i < 3; i++) {
+            const barracks = new THREE.Mesh(
+                new THREE.BoxGeometry(8, 4, 20),
+                materials.walls
+            );
+            barracks.position.set((i - 1) * 10, 2, 0);
+            this.buildingGroup.add(barracks);
+
+            // Sloped roof for each building
+            const roof = new THREE.Mesh(
+                new THREE.ConeGeometry(4, 2, 4),
+                materials.roof
+            );
+            roof.rotation.y = Math.PI / 4;
+            roof.position.set((i - 1) * 10, 5, 0);
+            roof.scale.set(2, 1, 5);
+            this.buildingGroup.add(roof);
+        }
+    }
+
+    createControlTower() {
+        const materials = {
+            base: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.7 }),
+            glass: new THREE.MeshStandardMaterial({ 
+                color: 0x88ccff, 
+                transparent: true, 
+                opacity: 0.6,
+                roughness: 0.2,
+                metalness: 0.8
+            })
+        };
+
+        // Base structure
+        const base = new THREE.Mesh(
+            new THREE.CylinderGeometry(3, 4, 20, 8),
+            materials.base
+        );
+        base.position.y = 10;
+        this.buildingGroup.add(base);
+
+        // Control room
+        const controlRoom = new THREE.Mesh(
+            new THREE.CylinderGeometry(6, 6, 5, 8),
+            materials.glass
+        );
+        controlRoom.position.y = 22;
+        this.buildingGroup.add(controlRoom);
+    }
+
+    createMilitaryFactory() {
+        const materials = {
+            walls: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.8 }),
+            roof: new THREE.MeshStandardMaterial({ color: 0x404040, roughness: 0.7 }),
+            details: new THREE.MeshStandardMaterial({ color: 0x606060, roughness: 0.6 })
+        };
+
+        // Main factory building
+        const mainBuilding = new THREE.Mesh(
+            new THREE.BoxGeometry(30, 12, 20),
+            materials.walls
+        );
+        mainBuilding.position.y = 6;
+        this.buildingGroup.add(mainBuilding);
+
+        // Smokestacks
+        for (let i = 0; i < 3; i++) {
+            const smokestack = new THREE.Mesh(
+                new THREE.CylinderGeometry(1, 1.5, 8, 8),
+                materials.details
+            );
+            smokestack.position.set(-10 + i * 8, 12, -5);
+            this.buildingGroup.add(smokestack);
+        }
+    }
+
+    createScienceFacility() {
+        const materials = {
+            base: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.7 }),
+            dome: new THREE.MeshStandardMaterial({ 
+                color: 0xaaaaaa, 
+                roughness: 0.3,
+                metalness: 0.8
+            })
+        };
+
+        // Main research building
+        const base = new THREE.Mesh(
+            new THREE.BoxGeometry(25, 8, 25),
+            materials.base
+        );
+        base.position.y = 4;
+        this.buildingGroup.add(base);
+
+        // Geodesic dome
+        const dome = new THREE.Mesh(
+            new THREE.SphereGeometry(10, 16, 16),
+            materials.dome
+        );
+        dome.position.y = 14;
+        this.buildingGroup.add(dome);
+    }
+
+    createRegularBuilding() {
         // Random building properties
         const width = 15 + Math.random() * 10;  // 15-25 width
         const depth = 15 + Math.random() * 10;  // 15-25 depth
@@ -33,11 +202,6 @@ export class Building {
             0x909090, // Light gray
         ];
         const randomColor = buildingColors[Math.floor(Math.random() * buildingColors.length)];
-        
-        // Create building container
-        this.buildingGroup = new THREE.Group();
-        this.buildingGroup.userData.isBuilding = true;
-        this.buildingGroup.userData.buildingInstance = this;
         
         // Main building body
         const buildingGeometry = new THREE.BoxGeometry(width, height, depth);
@@ -95,7 +259,7 @@ export class Building {
                 for (let w = 0; w < windowsCount; w++) {
                     const windowGeometry = new THREE.BoxGeometry(windowSize, windowSize, windowDepth);
                     const windowMesh = new THREE.Mesh(windowGeometry, windowMaterial);
-                    
+
                     // Position window
                     const offset = (buildingSide - windowSize) / 2;
                     const spacing = (buildingSide - windowSize) / (windowsCount + 1);
@@ -132,74 +296,6 @@ export class Building {
         );
         roofDetail.position.y = height + 1;
         this.buildingGroup.add(roofDetail);
-
-        // Position the building
-        this.buildingGroup.position.set(this.x, 0, this.z);
-
-        // Add to scene
-        this.scene.add(this.buildingGroup);
-    }
-
-    createHealthBar() {
-        // Create container for health bar that will follow building
-        this.healthBarContainer = new THREE.Object3D();
-        
-        // Background bar (gray)
-        const backgroundGeometry = new THREE.PlaneGeometry(3, 0.3);
-        const backgroundMaterial = new THREE.MeshBasicMaterial({
-            color: 0x444444,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.8
-        });
-        this.healthBarBackground = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
-        
-        // Health bar (green)
-        const healthGeometry = new THREE.PlaneGeometry(3, 0.3);
-        const healthMaterial = new THREE.MeshBasicMaterial({
-            color: 0x00ff00,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.8
-        });
-        this.healthBar = new THREE.Mesh(healthGeometry, healthMaterial);
-        
-        // Add meshes to container
-        this.healthBarContainer.add(this.healthBarBackground);
-        this.healthBarContainer.add(this.healthBar);
-        
-        // Position the health bar above the building
-        const buildingHeight = this.buildingGroup.children[0].geometry.parameters.height;
-        this.healthBarContainer.position.set(this.x, buildingHeight + 2, this.z);
-        
-        // Add container to scene
-        this.scene.add(this.healthBarContainer);
-        
-        // Initially hide the health bar
-        this.healthBarContainer.visible = false;
-    }
-
-    updateHealthBar() {
-        // Show health bar when damaged
-        if (this.currentHealth < this.maxHealth) {
-            this.healthBarContainer.visible = true;
-        }
-        
-        // Update health bar scale based on current health
-        const healthPercent = this.currentHealth / this.maxHealth;
-        this.healthBar.scale.x = Math.max(0, healthPercent);
-        
-        // Update color based on health percentage
-        if (healthPercent > 0.6) {
-            this.healthBar.material.color.setHex(0x00ff00); // Green
-        } else if (healthPercent > 0.3) {
-            this.healthBar.material.color.setHex(0xffff00); // Yellow
-        } else {
-            this.healthBar.material.color.setHex(0xff0000); // Red
-        }
-        
-        // Position the health bar to scale from left to right
-        this.healthBar.position.x = -1.5 * (1 - healthPercent);
     }
 
     createDamageOverlays(width, height, depth) {
@@ -406,7 +502,6 @@ export class Building {
         if (this.destroyed) return;
         
         this.currentHealth = Math.max(0, this.currentHealth - amount);
-        this.updateHealthBar();
         this.updateDamageState();
 
         if (this.currentHealth <= 0) {
@@ -422,11 +517,8 @@ export class Building {
         // Create explosion effect
         this.createExplosionEffect();
         
-        // Hide health bar
-        this.healthBarContainer.visible = false;
-        
         // Collapse building (animate downward and fade out)
-        const duration = 1000; // 1 second
+        const duration = 1000;
         const startTime = Date.now();
         const startHeight = this.buildingGroup.position.y;
         const startOpacity = 1;
@@ -435,10 +527,8 @@ export class Building {
             const now = Date.now();
             const progress = Math.min(1, (now - startTime) / duration);
             
-            // Ease out cubic
             const easeProgress = 1 - Math.pow(1 - progress, 3);
             
-            // Animate position and opacity
             this.buildingGroup.position.y = startHeight * (1 - easeProgress);
             this.buildingGroup.traverse((object) => {
                 if (object instanceof THREE.Mesh) {
@@ -452,13 +542,15 @@ export class Building {
             if (progress < 1) {
                 requestAnimationFrame(animate);
             } else {
-                // Remove building from scene
                 this.scene.remove(this.buildingGroup);
-                this.scene.remove(this.healthBarContainer);
                 
-                // Dispatch event for scoring
+                // Dispatch event with building type for scoring
                 const event = new CustomEvent('buildingDestroyed', {
-                    detail: { x: this.x, z: this.z }
+                    detail: { 
+                        x: this.x, 
+                        z: this.z,
+                        isMilitary: this.type.startsWith('military_')
+                    }
                 });
                 window.dispatchEvent(event);
             }
