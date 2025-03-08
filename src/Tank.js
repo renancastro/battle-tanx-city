@@ -7,6 +7,10 @@ export class Tank {
         this.rotationSpeed = 0.15;
         this.turretRotationSpeed = 0.1;
         
+        // Health system
+        this.maxHealth = 100;
+        this.currentHealth = this.maxHealth;
+        
         // Movement state
         this.keys = {
             w: false,
@@ -28,6 +32,7 @@ export class Tank {
 
         this.scene = scene;
         this.createTank();
+        this.createHealthBar();
         this.setupEventListeners();
     }
 
@@ -157,8 +162,8 @@ export class Tank {
     }
 
     createMuzzleFlash() {
-        // Create the flash mesh
-        const flashGeometry = new THREE.ConeGeometry(0.3, 0.8, 16);
+        // Create the flash mesh with larger dimensions
+        const flashGeometry = new THREE.ConeGeometry(0.4, 1.2, 16);
         const flashMaterial = new THREE.MeshBasicMaterial({
             color: 0xffa500,
             transparent: true,
@@ -170,8 +175,8 @@ export class Tank {
         const flashContainer = new THREE.Object3D();
         this.cannon.add(flashContainer);
         
-        // Position and rotate the container
-        flashContainer.position.set(0, 1, 0);
+        // Position and rotate the container - moved further out
+        flashContainer.position.set(0, 2, 0);
         flashContainer.rotation.x = -Math.PI / 2;
         
         // Add flash to container with proper rotation and position
@@ -180,8 +185,8 @@ export class Tank {
         flash.visible = false;
         flashContainer.add(flash);
         
-        // Create a point light for the flash
-        const light = new THREE.PointLight(0xffa500, 5, 3);
+        // Create a point light for the flash - increased range and intensity
+        const light = new THREE.PointLight(0xffa500, 8, 5);
         light.position.copy(flash.position);
         light.visible = false;
         flashContainer.add(light);
@@ -372,6 +377,107 @@ export class Tank {
         animate();
     }
 
+    createHealthBar() {
+        // Create container for health bar that will follow tank
+        this.healthBarContainer = new THREE.Object3D();
+        
+        // Background bar (gray)
+        const backgroundGeometry = new THREE.PlaneGeometry(3, 0.3);
+        const backgroundMaterial = new THREE.MeshBasicMaterial({
+            color: 0x444444,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8
+        });
+        this.healthBarBackground = new THREE.Mesh(backgroundGeometry, backgroundMaterial);
+        
+        // Health bar (green)
+        const healthGeometry = new THREE.PlaneGeometry(3, 0.3);
+        const healthMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ff00,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8
+        });
+        this.healthBar = new THREE.Mesh(healthGeometry, healthMaterial);
+        
+        // Position the health bar above the tank
+        this.healthBarContainer.position.y = 2.5;
+        
+        // Add meshes to container
+        this.healthBarContainer.add(this.healthBarBackground);
+        this.healthBarContainer.add(this.healthBar);
+        
+        // Add container to scene instead of tank body
+        this.scene.add(this.healthBarContainer);
+    }
+
+    updateHealthBar() {
+        // Update health bar scale based on current health
+        const healthPercent = this.currentHealth / this.maxHealth;
+        this.healthBar.scale.x = Math.max(0, healthPercent);
+        
+        // Update color based on health percentage
+        if (healthPercent > 0.6) {
+            this.healthBar.material.color.setHex(0x00ff00); // Green
+        } else if (healthPercent > 0.3) {
+            this.healthBar.material.color.setHex(0xffff00); // Yellow
+        } else {
+            this.healthBar.material.color.setHex(0xff0000); // Red
+        }
+        
+        // Position the health bar to scale from left to right
+        this.healthBar.position.x = -1 * (1 - healthPercent);
+    }
+
+    takeDamage(amount) {
+        this.currentHealth = Math.max(0, this.currentHealth - amount);
+        this.updateHealthBar();
+        
+        // Flash the tank red when taking damage
+        const originalColor = this.body.material.color.getHex();
+        this.body.traverse((object) => {
+            if (object instanceof THREE.Mesh && object.material.color) {
+                object.material.color.setHex(0xff0000);
+            }
+        });
+        
+        // Reset color after 100ms
+        setTimeout(() => {
+            this.body.traverse((object) => {
+                if (object instanceof THREE.Mesh && object.material.color) {
+                    object.material.color.setHex(originalColor);
+                }
+            });
+        }, 100);
+
+        // Check if tank is destroyed
+        if (this.currentHealth <= 0) {
+            this.onDestroyed();
+        }
+    }
+
+    heal(amount) {
+        this.currentHealth = Math.min(this.maxHealth, this.currentHealth + amount);
+        this.updateHealthBar();
+    }
+
+    onDestroyed() {
+        // Flash the tank red
+        this.body.traverse((object) => {
+            if (object instanceof THREE.Mesh && object.material.color) {
+                object.material.color.setHex(0xff0000);
+            }
+        });
+        
+        // Disable movement
+        this.speed = 0;
+        this.rotationSpeed = 0;
+        
+        // You could add explosion effects, particle systems, etc. here
+        console.log('Tank destroyed!');
+    }
+
     update(ground, mouse, raycaster, camera) {
         // Calculate next position before moving
         let nextX = this.body.position.x;
@@ -436,6 +542,25 @@ export class Tank {
             const direction = targetPoint.sub(tankPosition);
             const angle = Math.atan2(direction.x, direction.z);
             this.turret.rotation.y = -this.body.rotation.y + angle;
+        }
+
+        // Update health bar position to follow tank
+        const tankPosition = this.body.position;
+        this.healthBarContainer.position.set(
+            tankPosition.x,
+            tankPosition.y + 2.5,
+            tankPosition.z
+        );
+
+        // Make health bar face the camera while staying horizontal
+        if (camera) {
+            // Get camera direction vector
+            const cameraDir = new THREE.Vector3();
+            camera.getWorldDirection(cameraDir);
+            
+            // Calculate rotation to face camera but only on Y axis
+            const angle = Math.atan2(cameraDir.x, cameraDir.z);
+            this.healthBarContainer.rotation.y = angle;
         }
 
         this.updateProjectiles();
