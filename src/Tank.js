@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 
 export class Tank {
-    constructor(scene, audioManager) {
+    constructor(scene, audioManager, tankType = 'M1A1') {
         // Tank properties
         this.speed = 4.0;
         this.rotationSpeed = 0.4;
         this.turretRotationSpeed = 0.2;
+        this.tankType = tankType; // 'M1A1' or 'ModelS'
         
         // Audio system
         this.audioManager = audioManager;
@@ -69,6 +70,226 @@ export class Tank {
     }
 
     createTank() {
+        if (this.tankType === 'ModelS') {
+            this.createTeslaModelS();
+        } else {
+            this.createM1A1();
+        }
+
+        // Enable shadows
+        this.body.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                object.castShadow = true;
+                object.receiveShadow = true;
+            }
+        });
+
+        // Add to scene
+        this.scene.add(this.body);
+
+        // Projectile template
+        this.projectileGeometry = new THREE.SphereGeometry(0.2);
+        this.projectileMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xff0000,
+            emissive: 0xff0000,
+            emissiveIntensity: 1,
+            toneMapped: false
+        });
+    }
+
+    createTeslaModelS() {
+        // Tesla Model S materials
+        const bodyMaterial = new THREE.MeshStandardMaterial({ 
+            color: this.tankColor,
+            roughness: 0.2,
+            metalness: 0.8
+        });
+        const glassMaterial = new THREE.MeshStandardMaterial({
+            color: 0x88ccff,
+            transparent: true,
+            opacity: 0.6,
+            roughness: 0.2,
+            metalness: 0.9
+        });
+        const detailMaterial = new THREE.MeshStandardMaterial({
+            color: 0x111111,
+            roughness: 0.5,
+            metalness: 0.7
+        });
+        const lightMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            emissive: 0xffffff,
+            emissiveIntensity: 0.5,
+            roughness: 0.3,
+            metalness: 0.9
+        });
+
+        // Main body group
+        this.body = new THREE.Group();
+
+        // Lower body (main chassis)
+        const lowerBodyGeometry = new THREE.BoxGeometry(3.8, 0.6, 5.2);
+        const lowerBody = new THREE.Mesh(lowerBodyGeometry, bodyMaterial);
+        lowerBody.position.set(0, 0.5, 0);
+        this.body.add(lowerBody);
+
+        // Middle body (passenger compartment)
+        const middleBodyGeometry = new THREE.BoxGeometry(3.6, 0.8, 4.8);
+        const middleBody = new THREE.Mesh(middleBodyGeometry, bodyMaterial);
+        middleBody.position.set(0, 1.2, 0);
+        this.body.add(middleBody);
+
+        // Upper body (roof)
+        const upperBodyGeometry = new THREE.BoxGeometry(3.4, 0.4, 4.4);
+        const upperBody = new THREE.Mesh(upperBodyGeometry, bodyMaterial);
+        upperBody.position.set(0, 1.8, 0);
+        this.body.add(upperBody);
+
+        // Front hood (sloped)
+        const hoodGeometry = new THREE.BoxGeometry(3.6, 0.2, 1.8);
+        const hood = new THREE.Mesh(hoodGeometry, bodyMaterial);
+        hood.position.set(0, 1.3, -1.8);
+        hood.rotation.x = -Math.PI * 0.06;
+        this.body.add(hood);
+
+        // Rear trunk (slightly raised)
+        const trunkGeometry = new THREE.BoxGeometry(3.6, 0.2, 1.4);
+        const trunk = new THREE.Mesh(trunkGeometry, bodyMaterial);
+        trunk.position.set(0, 1.4, 1.8);
+        trunk.rotation.x = Math.PI * 0.03;
+        this.body.add(trunk);
+
+        // Front nose cone
+        const noseGeometry = new THREE.BoxGeometry(3.6, 0.8, 1.0);
+        const nose = new THREE.Mesh(noseGeometry, bodyMaterial);
+        nose.position.set(0, 0.8, -2.4);
+        this.body.add(nose);
+
+        // Side skirts
+        const skirtGeometry = new THREE.BoxGeometry(0.2, 0.4, 4.8);
+        const leftSkirt = new THREE.Mesh(skirtGeometry, bodyMaterial);
+        leftSkirt.position.set(-1.9, 0.4, 0);
+        this.body.add(leftSkirt);
+
+        const rightSkirt = leftSkirt.clone();
+        rightSkirt.position.x = 1.9;
+        this.body.add(rightSkirt);
+
+        // Roof curves
+        const roofCurveGeometry = new THREE.CylinderGeometry(0.4, 0.4, 3.4, 16, 1, true, Math.PI, Math.PI);
+        const frontRoofCurve = new THREE.Mesh(roofCurveGeometry, bodyMaterial);
+        frontRoofCurve.rotation.z = Math.PI / 2;
+        frontRoofCurve.position.set(0, 1.8, -1.2);
+        this.body.add(frontRoofCurve);
+
+        const rearRoofCurve = frontRoofCurve.clone();
+        rearRoofCurve.position.z = 1.2;
+        this.body.add(rearRoofCurve);
+
+        // Windshield
+        const windshieldGeometry = new THREE.PlaneGeometry(3.2, 1.2);
+        const windshield = new THREE.Mesh(windshieldGeometry, glassMaterial);
+        windshield.rotation.x = -Math.PI * 0.25;
+        windshield.position.set(0, 1.6, -1.2);
+        this.body.add(windshield);
+
+        // Rear window
+        const rearWindow = windshield.clone();
+        rearWindow.rotation.x = Math.PI * 0.25;
+        rearWindow.position.z = 1.2;
+        this.body.add(rearWindow);
+
+        // Side windows
+        const sideWindowGeometry = new THREE.PlaneGeometry(2.0, 0.8);
+        const leftWindow = new THREE.Mesh(sideWindowGeometry, glassMaterial);
+        leftWindow.rotation.y = Math.PI / 2;
+        leftWindow.position.set(-1.81, 1.5, 0);
+        this.body.add(leftWindow);
+
+        const rightWindow = leftWindow.clone();
+        rightWindow.rotation.y = -Math.PI / 2;
+        rightWindow.position.x = 1.81;
+        this.body.add(rightWindow);
+
+        // Wheels with Tesla-style rims
+        const wheelGeometry = new THREE.CylinderGeometry(0.35, 0.35, 0.3, 24);
+        const wheelPositions = [
+            { x: -1.8, z: -1.5 },
+            { x: 1.8, z: -1.5 },
+            { x: -1.8, z: 1.5 },
+            { x: 1.8, z: 1.5 }
+        ];
+
+        wheelPositions.forEach(pos => {
+            const wheelRim = new THREE.Group();
+            
+            // Main wheel
+            const wheel = new THREE.Mesh(wheelGeometry, detailMaterial);
+            wheelRim.add(wheel);
+
+            // Tesla-style rim design
+            for (let i = 0; i < 5; i++) {
+                const spoke = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.25, 0.02, 0.05),
+                    detailMaterial
+                );
+                spoke.rotation.z = (i / 5) * Math.PI * 2;
+                spoke.position.y = 0;
+                wheelRim.add(spoke);
+            }
+
+            wheelRim.rotation.z = Math.PI / 2;
+            wheelRim.position.set(pos.x, 0.35, pos.z);
+            this.body.add(wheelRim);
+        });
+
+        // Headlights (Tesla's distinctive LED strip)
+        const headlightGeometry = new THREE.BoxGeometry(0.8, 0.1, 0.1);
+        
+        // Left headlight
+        const leftHeadlight = new THREE.Mesh(headlightGeometry, lightMaterial);
+        leftHeadlight.position.set(-1.2, 0.8, -2.5);
+        this.body.add(leftHeadlight);
+
+        // Right headlight
+        const rightHeadlight = leftHeadlight.clone();
+        rightHeadlight.position.x = 1.2;
+        this.body.add(rightHeadlight);
+
+        // Taillights (Tesla's distinctive light bar)
+        const tailLightGeometry = new THREE.BoxGeometry(3.6, 0.1, 0.05);
+        const tailLight = new THREE.Mesh(tailLightGeometry, lightMaterial);
+        tailLight.position.set(0, 1.1, 2.3);
+        this.body.add(tailLight);
+
+        // Turret (retractable weapon system)
+        this.turret = new THREE.Group();
+        
+        // Weapon housing (sleek, retractable design)
+        const housingGeometry = new THREE.BoxGeometry(1.5, 0.15, 1.2);
+        const housing = new THREE.Mesh(housingGeometry, bodyMaterial);
+        this.turret.position.set(0, 1.9, -0.8);
+        this.turret.add(housing);
+
+        // Main weapon (slimmer for Tesla design)
+        const mainGunGeometry = new THREE.CylinderGeometry(0.06, 0.06, 3, 16);
+        this.cannon = new THREE.Mesh(mainGunGeometry, detailMaterial);
+        this.cannon.position.z = 1.5;
+        this.cannon.rotation.x = Math.PI / 2;
+        this.turret.add(this.cannon);
+
+        // Add turret to body
+        this.body.add(this.turret);
+
+        // Tesla logo
+        const logoGeometry = new THREE.CircleGeometry(0.2, 32);
+        const logo = new THREE.Mesh(logoGeometry, detailMaterial);
+        logo.position.set(0, 0.9, -2.55);
+        logo.rotation.y = Math.PI;
+        this.body.add(logo);
+    }
+
+    createM1A1() {
         // Tank materials
         const tankMaterial = new THREE.MeshStandardMaterial({ 
             color: this.tankColor,
@@ -171,26 +392,6 @@ export class Tank {
         this.body.add(this.turret);
         // Add cannon to turret
         this.turret.add(this.cannon);
-
-        // Enable shadows
-        this.body.traverse((object) => {
-            if (object instanceof THREE.Mesh) {
-                object.castShadow = true;
-                object.receiveShadow = true;
-            }
-        });
-
-        // Add to scene
-        this.scene.add(this.body);
-
-        // Projectile template
-        this.projectileGeometry = new THREE.SphereGeometry(0.2);
-        this.projectileMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0xff0000,
-            emissive: 0xff0000,
-            emissiveIntensity: 1,
-            toneMapped: false
-        });
     }
 
     createMuzzleFlash() {

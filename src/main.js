@@ -408,7 +408,7 @@ generateCity();
 createBoundaryWalls();
 
 // Create player tank
-const tank = new Tank(scene, audioManager);
+const tank = new Tank(scene, audioManager, 'ModelS');
 
 // Camera setup
 camera.position.set(0, 15, 15); // Reduced initial z distance from 20 to 15
