@@ -46,7 +46,7 @@ export class AudioManager {
     }
 
     createCannonSound(type) {
-        const duration = type === 'echo' ? 1.0 : 0.3; // Shortened duration for punchier sound
+        const duration = type === 'echo' ? 2.0 : 0.5; // Longer duration for more powerful sound
         const sampleRate = this.audioContext.sampleRate;
         const bufferSize = duration * sampleRate;
         const buffer = this.audioContext.createBuffer(1, bufferSize, sampleRate);
@@ -56,39 +56,45 @@ export class AudioManager {
         for (let i = 0; i < bufferSize; i++) {
             const t = i / sampleRate;
             
-            // Base explosion (white noise with exponential decay)
-            const decay = Math.exp(-12 * t); // Faster decay
+            // Base explosion (white noise with slower decay for more power)
+            const decay = Math.exp(-8 * t); // Slower decay for longer rumble
             const noise = (Math.random() * 2 - 1) * decay;
             
-            // Low frequency rumble (lowered frequency for more impact)
-            const rumble = Math.sin(2 * Math.PI * 20 * t) * Math.exp(-6 * t);
+            // Deep bass rumble (lowered frequency for artillery-like sound)
+            const bassRumble = Math.sin(2 * Math.PI * 15 * t) * Math.exp(-4 * t);
             
-            // Mid frequency impact (increased frequency for sharper sound)
-            const impact = Math.sin(2 * Math.PI * 150 * t) * Math.exp(-35 * t);
+            // Mid frequency impact (adjusted for 155mm characteristic)
+            const impact = Math.sin(2 * Math.PI * 100 * t) * Math.exp(-20 * t);
 
-            // High frequency crack (new component)
-            const crack = Math.sin(2 * Math.PI * 400 * t) * Math.exp(-50 * t);
+            // High frequency crack (sharper initial crack)
+            const crack = Math.sin(2 * Math.PI * 800 * t) * Math.exp(-60 * t);
+
+            // Secondary explosion components
+            const secondaryBoom = Math.sin(2 * Math.PI * 40 * t) * Math.exp(-10 * t);
 
             // Combine all components with different weights based on sound type
             if (type === 'near') {
                 data[i] = (
-                    noise * 0.6 + 
-                    rumble * 0.3 + 
+                    noise * 0.4 + 
+                    bassRumble * 0.5 + // Increased bass for near sound
                     impact * 0.3 + 
-                    crack * 0.2
-                ) * Math.exp(-4 * t);
+                    crack * 0.3 +
+                    secondaryBoom * 0.3
+                ) * Math.exp(-3 * t);
             } else if (type === 'far') {
                 data[i] = (
-                    noise * 0.3 + 
-                    rumble * 0.5 + 
-                    impact * 0.2
-                ) * Math.exp(-3 * t);
+                    noise * 0.2 + 
+                    bassRumble * 0.6 + // More bass in distance
+                    impact * 0.2 +
+                    secondaryBoom * 0.4
+                ) * Math.exp(-2 * t);
             } else { // echo
-                const delayedDecay = Math.exp(-2 * t);
+                const delayedDecay = Math.exp(-1.5 * t);
                 data[i] = (
                     noise * 0.1 + 
-                    rumble * 0.7 + 
-                    impact * 0.1
+                    bassRumble * 0.8 + // Echo dominated by bass
+                    impact * 0.1 +
+                    secondaryBoom * 0.3
                 ) * delayedDecay;
             }
         }
@@ -101,19 +107,19 @@ export class AudioManager {
         this.soundPools.cannonFire.near.sounds.forEach(sound => {
             const buffer = this.createCannonSound('near');
             sound.setBuffer(buffer);
-            sound.setVolume(0.7); // Increased volume for near sound
+            sound.setVolume(0.8); // Increased volume for more impact
         });
 
         this.soundPools.cannonFire.far.sounds.forEach(sound => {
             const buffer = this.createCannonSound('far');
             sound.setBuffer(buffer);
-            sound.setVolume(0.4); // Increased volume for far sound
+            sound.setVolume(0.5); // Increased volume for distant sound
         });
 
         this.soundPools.cannonFire.echo.sounds.forEach(sound => {
             const buffer = this.createCannonSound('echo');
             sound.setBuffer(buffer);
-            sound.setVolume(0.3); // Increased volume for echo
+            sound.setVolume(0.4); // Increased echo volume
         });
     }
 
@@ -130,14 +136,14 @@ export class AudioManager {
         // Play sounds with proper timing
         nearSound.play();
         
-        // Play the distant sound with minimal delay
+        // Play the distant sound with slight delay
         setTimeout(() => {
             farSound.play();
-        }, 30); // Reduced delay for tighter sound
+        }, 50); // Increased delay for more realistic sound propagation
         
-        // Play the echo with shorter delay
+        // Play the echo with longer delay
         setTimeout(() => {
             echoSound.play();
-        }, 100); // Reduced delay for tighter sound
+        }, 150); // Increased delay for more realistic echo
     }
 } 

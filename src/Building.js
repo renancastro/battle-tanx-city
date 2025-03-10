@@ -44,9 +44,20 @@ export class Building {
 
     createMilitaryAirport() {
         const materials = {
-            main: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.7 }),
-            runway: new THREE.MeshStandardMaterial({ color: 0x202020, roughness: 0.9 }),
-            details: new THREE.MeshStandardMaterial({ color: 0x707070, roughness: 0.5 })
+            main: new THREE.MeshStandardMaterial({ 
+                color: 0x4b5320, // Olive drab
+                roughness: 0.8,
+                metalness: 0.2
+            }),
+            runway: new THREE.MeshStandardMaterial({ 
+                color: 0x1a1a1a, // Dark asphalt
+                roughness: 0.9 
+            }),
+            details: new THREE.MeshStandardMaterial({ 
+                color: 0x8b7355, // Khaki
+                roughness: 0.6,
+                metalness: 0.3
+            })
         };
 
         // Main terminal building
@@ -76,8 +87,16 @@ export class Building {
 
     createMilitaryBarracks() {
         const materials = {
-            walls: new THREE.MeshStandardMaterial({ color: 0x606060, roughness: 0.8 }),
-            roof: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.7 })
+            walls: new THREE.MeshStandardMaterial({ 
+                color: 0x5d5d3d, // Military green
+                roughness: 0.8,
+                metalness: 0.1
+            }),
+            roof: new THREE.MeshStandardMaterial({ 
+                color: 0x3d3d28, // Darker military green
+                roughness: 0.7,
+                metalness: 0.2
+            })
         };
 
         // Multiple barrack buildings
@@ -103,13 +122,22 @@ export class Building {
 
     createControlTower() {
         const materials = {
-            base: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.7 }),
+            base: new THREE.MeshStandardMaterial({ 
+                color: 0x4a5f2a, // Dark olive green
+                roughness: 0.7,
+                metalness: 0.3
+            }),
             glass: new THREE.MeshStandardMaterial({ 
-                color: 0x88ccff, 
-                transparent: true, 
+                color: 0x88ccff,
+                transparent: true,
                 opacity: 0.6,
                 roughness: 0.2,
                 metalness: 0.8
+            }),
+            details: new THREE.MeshStandardMaterial({
+                color: 0x2f3d1b, // Darker military green
+                roughness: 0.6,
+                metalness: 0.4
             })
         };
 
@@ -128,13 +156,41 @@ export class Building {
         );
         controlRoom.position.y = 22;
         this.buildingGroup.add(controlRoom);
+
+        // Add radar dish
+        const radarBase = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.5, 0.5, 2, 8),
+            materials.details
+        );
+        radarBase.position.y = 25;
+        this.buildingGroup.add(radarBase);
+
+        const radarDish = new THREE.Mesh(
+            new THREE.SphereGeometry(2, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2),
+            materials.details
+        );
+        radarDish.rotation.x = Math.PI / 4;
+        radarDish.position.y = 26;
+        this.buildingGroup.add(radarDish);
     }
 
     createMilitaryFactory() {
         const materials = {
-            walls: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.8 }),
-            roof: new THREE.MeshStandardMaterial({ color: 0x404040, roughness: 0.7 }),
-            details: new THREE.MeshStandardMaterial({ color: 0x606060, roughness: 0.6 })
+            walls: new THREE.MeshStandardMaterial({ 
+                color: 0x4f5942, // Military olive
+                roughness: 0.8,
+                metalness: 0.2
+            }),
+            roof: new THREE.MeshStandardMaterial({ 
+                color: 0x363d2d, // Dark military green
+                roughness: 0.7,
+                metalness: 0.3
+            }),
+            details: new THREE.MeshStandardMaterial({ 
+                color: 0x6b735a, // Light military green
+                roughness: 0.6,
+                metalness: 0.4
+            })
         };
 
         // Main factory building
@@ -154,15 +210,32 @@ export class Building {
             smokestack.position.set(-10 + i * 8, 12, -5);
             this.buildingGroup.add(smokestack);
         }
+
+        // Add some industrial details
+        const roofStructure = new THREE.Mesh(
+            new THREE.BoxGeometry(28, 2, 18),
+            materials.roof
+        );
+        roofStructure.position.y = 13;
+        this.buildingGroup.add(roofStructure);
     }
 
     createScienceFacility() {
         const materials = {
-            base: new THREE.MeshStandardMaterial({ color: 0x505050, roughness: 0.7 }),
+            base: new THREE.MeshStandardMaterial({ 
+                color: 0x4d5d53, // Military sage
+                roughness: 0.7,
+                metalness: 0.4
+            }),
             dome: new THREE.MeshStandardMaterial({ 
-                color: 0xaaaaaa, 
+                color: 0x6b7c70, // Light military sage
                 roughness: 0.3,
                 metalness: 0.8
+            }),
+            details: new THREE.MeshStandardMaterial({
+                color: 0x3a463e, // Dark military sage
+                roughness: 0.5,
+                metalness: 0.6
             })
         };
 
@@ -181,6 +254,23 @@ export class Building {
         );
         dome.position.y = 14;
         this.buildingGroup.add(dome);
+
+        // Add research antennas
+        for (let i = 0; i < 4; i++) {
+            const angle = (i / 4) * Math.PI * 2;
+            const antenna = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.2, 0.2, 6, 8),
+                materials.details
+            );
+            antenna.position.set(
+                Math.cos(angle) * 8,
+                16,
+                Math.sin(angle) * 8
+            );
+            antenna.rotation.x = Math.PI / 6;
+            antenna.rotation.y = angle;
+            this.buildingGroup.add(antenna);
+        }
     }
 
     createRegularBuilding() {
