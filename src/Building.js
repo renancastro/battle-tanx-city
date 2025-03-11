@@ -6,13 +6,15 @@ export class Building {
         this.x = x;
         this.z = z;
         this.type = type;
-        this.maxHealth = type === 'military' ? 600 : 400;  // Military buildings are tougher
+        this.maxHealth = type === 'military_gigafactory' ? 800 : 
+                        type === 'military' ? 600 : 400;
         this.currentHealth = this.maxHealth;
         this.destroyed = false;
         this.buildingGroup = new THREE.Group();
         this.buildingGroup.userData.isBuilding = true;
         this.buildingGroup.userData.buildingInstance = this;
         this.damageLevel = 0;
+        this.pointValue = type === 'military_gigafactory' ? 200 : 100;
         this.createBuilding();
     }
 
@@ -32,6 +34,9 @@ export class Building {
                 break;
             case 'military_science':
                 this.createScienceFacility();
+                break;
+            case 'military_gigafactory':
+                this.createGigafactory();
                 break;
             default:
                 this.createRegularBuilding();
@@ -271,6 +276,106 @@ export class Building {
             antenna.rotation.y = angle;
             this.buildingGroup.add(antenna);
         }
+    }
+
+    createGigafactory() {
+        const materials = {
+            walls: new THREE.MeshStandardMaterial({ 
+                color: 0xcccccc, // Modern industrial white
+                roughness: 0.7,
+                metalness: 0.3
+            }),
+            glass: new THREE.MeshStandardMaterial({ 
+                color: 0x88ccff,
+                transparent: true,
+                opacity: 0.6,
+                roughness: 0.2,
+                metalness: 0.9
+            }),
+            solar: new THREE.MeshStandardMaterial({ 
+                color: 0x1a1a1a, // Dark solar panels
+                roughness: 0.5,
+                metalness: 0.8
+            }),
+            logo: new THREE.MeshStandardMaterial({
+                color: 0xff0000,
+                emissive: 0xff0000,
+                emissiveIntensity: 0.5
+            })
+        };
+
+        // Main factory building (larger than standard buildings)
+        const mainBuilding = new THREE.Mesh(
+            new THREE.BoxGeometry(40, 15, 60),
+            materials.walls
+        );
+        mainBuilding.position.y = 7.5;
+        this.buildingGroup.add(mainBuilding);
+
+        // Roof with solar panels
+        const roofBase = new THREE.Mesh(
+            new THREE.BoxGeometry(42, 1, 62),
+            materials.walls
+        );
+        roofBase.position.y = 15.5;
+        this.buildingGroup.add(roofBase);
+
+        // Add solar panel array
+        for (let x = -18; x <= 18; x += 6) {
+            for (let z = -25; z <= 25; z += 8) {
+                const solarPanel = new THREE.Mesh(
+                    new THREE.BoxGeometry(5, 0.2, 7),
+                    materials.solar
+                );
+                solarPanel.position.set(x, 16, z);
+                solarPanel.rotation.x = -Math.PI * 0.1; // Slight tilt for sunlight
+                this.buildingGroup.add(solarPanel);
+            }
+        }
+
+        // Add windows
+        const windowRowGeometry = new THREE.BoxGeometry(38, 2, 0.2);
+        for (let y = 3; y <= 12; y += 3) {
+            // Front windows
+            const frontWindow = new THREE.Mesh(windowRowGeometry, materials.glass);
+            frontWindow.position.set(0, y, 30.1);
+            this.buildingGroup.add(frontWindow);
+
+            // Back windows
+            const backWindow = new THREE.Mesh(windowRowGeometry, materials.glass);
+            backWindow.position.set(0, y, -30.1);
+            this.buildingGroup.add(backWindow);
+        }
+
+        // Side windows
+        const sideWindowGeometry = new THREE.BoxGeometry(0.2, 2, 58);
+        for (let y = 3; y <= 12; y += 3) {
+            // Left windows
+            const leftWindow = new THREE.Mesh(sideWindowGeometry, materials.glass);
+            leftWindow.position.set(-20.1, y, 0);
+            this.buildingGroup.add(leftWindow);
+
+            // Right windows
+            const rightWindow = new THREE.Mesh(sideWindowGeometry, materials.glass);
+            rightWindow.position.set(20.1, y, 0);
+            this.buildingGroup.add(rightWindow);
+        }
+
+        // Tesla logo on front
+        const logo = new THREE.Mesh(
+            new THREE.BoxGeometry(10, 10, 0.5),
+            materials.logo
+        );
+        logo.position.set(0, 12, 30.1);
+        this.buildingGroup.add(logo);
+
+        // Enable shadows
+        this.buildingGroup.traverse((object) => {
+            if (object instanceof THREE.Mesh) {
+                object.castShadow = true;
+                object.receiveShadow = true;
+            }
+        });
     }
 
     createRegularBuilding() {

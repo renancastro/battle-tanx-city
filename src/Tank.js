@@ -244,10 +244,21 @@ export class Tank {
         });
 
         // Headlights (Tesla's distinctive LED strip)
-        const headlightGeometry = new THREE.BoxGeometry(0.8, 0.1, 0.1);
+        const headlightMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            emissive: 0xffffff,
+            emissiveIntensity: 2,
+            roughness: 0.3,
+            metalness: 0.9,
+            transparent: true,
+            opacity: 0.9
+        });
+
+        // Main LED strips
+        const headlightGeometry = new THREE.BoxGeometry(1.2, 0.15, 0.1);
         
         // Left headlight
-        const leftHeadlight = new THREE.Mesh(headlightGeometry, lightMaterial);
+        const leftHeadlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
         leftHeadlight.position.set(-1.2, 0.8, -2.5);
         this.body.add(leftHeadlight);
 
@@ -256,11 +267,47 @@ export class Tank {
         rightHeadlight.position.x = 1.2;
         this.body.add(rightHeadlight);
 
+        // Add point lights for headlight glow
+        const headlightGlow = new THREE.PointLight(0xffffff, 2, 10);
+        headlightGlow.position.set(0, 0.8, -2.5);
+        this.body.add(headlightGlow);
+
         // Taillights (Tesla's distinctive light bar)
-        const tailLightGeometry = new THREE.BoxGeometry(3.6, 0.1, 0.05);
-        const tailLight = new THREE.Mesh(tailLightGeometry, lightMaterial);
+        const taillightMaterial = new THREE.MeshStandardMaterial({
+            color: 0xff0000,
+            emissive: 0xff0000,
+            emissiveIntensity: 3,
+            roughness: 0.3,
+            metalness: 0.9,
+            transparent: true,
+            opacity: 0.9
+        });
+
+        // Main taillight bar
+        const tailLightGeometry = new THREE.BoxGeometry(3.4, 0.15, 0.1);
+        const tailLight = new THREE.Mesh(tailLightGeometry, taillightMaterial);
         tailLight.position.set(0, 1.1, 2.3);
         this.body.add(tailLight);
+
+        // Additional taillight details
+        const tailLightDetailGeometry = new THREE.BoxGeometry(0.3, 0.15, 0.1);
+        
+        // Left corner taillight
+        const leftTailDetail = new THREE.Mesh(tailLightDetailGeometry, taillightMaterial);
+        leftTailDetail.position.set(-1.7, 1.1, 2.25);
+        leftTailDetail.rotation.y = Math.PI * 0.25;
+        this.body.add(leftTailDetail);
+
+        // Right corner taillight
+        const rightTailDetail = new THREE.Mesh(tailLightDetailGeometry, taillightMaterial);
+        rightTailDetail.position.set(1.7, 1.1, 2.25);
+        rightTailDetail.rotation.y = -Math.PI * 0.25;
+        this.body.add(rightTailDetail);
+
+        // Add point light for taillight glow
+        const taillightGlow = new THREE.PointLight(0xff0000, 2, 10);
+        taillightGlow.position.set(0, 1.1, 2.3);
+        this.body.add(taillightGlow);
 
         // Turret (retractable weapon system)
         this.turret = new THREE.Group();

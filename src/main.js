@@ -241,11 +241,51 @@ function generateCity() {
         { type: 'military_barracks', x: 0, z: -200 },     // South side
         { type: 'military_control_tower', x: 200, z: 0 },  // East side
         { type: 'military_factory', x: 0, z: 200 },       // North side
-        { type: 'military_science', x: 0, z: 0 }          // Center
+        { type: 'military_science', x: 0, z: 0 },         // Center
+        { type: 'military_gigafactory', x: 160, z: 160 }  // Northeast quadrant - moved further out
     ];
 
+    // Keep track of placed buildings to check for overlaps
+    const placedBuildings = [];
+
+    // Helper function to check if a new building would overlap with existing ones
+    function wouldOverlap(newX, newZ, buildingType) {
+        // Define building sizes (width x depth)
+        const buildingSizes = {
+            'military_airport': { width: 55, depth: 30 },    // Including runway
+            'military_barracks': { width: 30, depth: 20 },
+            'military_control_tower': { width: 12, depth: 12 },
+            'military_factory': { width: 30, depth: 20 },
+            'military_science': { width: 25, depth: 25 },
+            'military_gigafactory': { width: 40, depth: 60 }
+        };
+
+        const newSize = buildingSizes[buildingType] || { width: 20, depth: 20 };
+        const safetyMargin = 10; // Extra space between buildings
+
+        for (const placed of placedBuildings) {
+            const placedSize = buildingSizes[placed.type] || { width: 20, depth: 20 };
+            
+            // Calculate the minimum distance needed between building centers
+            const minX = (newSize.width + placedSize.width) / 2 + safetyMargin;
+            const minZ = (newSize.depth + placedSize.depth) / 2 + safetyMargin;
+
+            // Check if buildings overlap
+            if (Math.abs(newX - placed.x) < minX && Math.abs(newZ - placed.z) < minZ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Place military buildings with overlap checking
     militaryBuildings.forEach(building => {
-        new Building(scene, building.x, building.z, building.type);
+        if (!wouldOverlap(building.x, building.z, building.type)) {
+            new Building(scene, building.x, building.z, building.type);
+            placedBuildings.push(building);
+        } else {
+            console.warn(`Skipping overlapping building: ${building.type} at (${building.x}, ${building.z})`);
+        }
     });
 
     // Add regular buildings along roads
