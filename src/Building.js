@@ -13,6 +13,7 @@ export class Building {
         this.buildingGroup = new THREE.Group();
         this.buildingGroup.userData.isBuilding = true;
         this.buildingGroup.userData.buildingInstance = this;
+        this.buildingGroup.userData.buildingType = type;
         this.damageLevel = 0;
         this.pointValue = type === 'military_gigafactory' ? 200 : 100;
         this.createBuilding();

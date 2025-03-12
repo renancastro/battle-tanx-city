@@ -242,7 +242,7 @@ function generateCity() {
         { type: 'military_control_tower', x: 200, z: 0 },  // East side
         { type: 'military_factory', x: 0, z: 200 },       // North side
         { type: 'military_science', x: 0, z: 0 },         // Center
-        { type: 'military_gigafactory', x: 160, z: 160 }  // Northeast quadrant - moved further out
+        { type: 'military_gigafactory', x: 240, z: 240 }  // Northeast quadrant - adjusted to be within playable area
     ];
 
     // Keep track of placed buildings to check for overlaps
@@ -261,8 +261,32 @@ function generateCity() {
         };
 
         const newSize = buildingSizes[buildingType] || { width: 20, depth: 20 };
-        const safetyMargin = 10; // Extra space between buildings
+        const safetyMargin = 20; // Increased safety margin for better spacing
 
+        // Check if position is too close to map boundary
+        const mapBoundary = 450 - safetyMargin; // Half of map size (900/2) minus safety margin
+        if (Math.abs(newX) > mapBoundary || Math.abs(newZ) > mapBoundary) {
+            return true; // Too close to boundary
+        }
+
+        // Check if near any road
+        const roadWidth = 12;
+        const gridSize = 4;
+        const mapSize = 900;
+        const spacing = (mapSize - 20) / (gridSize - 1);
+
+        // Check horizontal roads
+        for (let i = 0; i < gridSize; i++) {
+            const roadZ = -mapSize/2 + i * spacing;
+            if (Math.abs(newZ - roadZ) < roadWidth + safetyMargin) return true;
+        }
+        // Check vertical roads
+        for (let i = 0; i < gridSize; i++) {
+            const roadX = -mapSize/2 + i * spacing;
+            if (Math.abs(newX - roadX) < roadWidth + safetyMargin) return true;
+        }
+
+        // Check other buildings
         for (const placed of placedBuildings) {
             const placedSize = buildingSizes[placed.type] || { width: 20, depth: 20 };
             

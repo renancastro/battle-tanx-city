@@ -595,16 +595,38 @@ export class Tank {
                 // Check collision with buildings
                 let hitBuilding = false;
                 for (const building of buildings) {
-                    // Simple box collision check
-                    const buildingBounds = {
-                        minX: building.position.x - 10,
-                        maxX: building.position.x + 10,
-                        minZ: building.position.z - 10,
-                        maxZ: building.position.z + 10
+                    // Get building dimensions based on type
+                    const buildingSizes = {
+                        'military_airport': { width: 55, depth: 30 },
+                        'military_barracks': { width: 30, depth: 20 },
+                        'military_control_tower': { width: 12, depth: 12 },
+                        'military_factory': { width: 30, depth: 20 },
+                        'military_science': { width: 25, depth: 25 },
+                        'military_gigafactory': { width: 40, depth: 60 }
                     };
+
+                    const buildingType = building.userData.buildingType;
+                    console.log('Checking collision with building type:', buildingType);
+                    
+                    const buildingSize = buildingSizes[buildingType] || { width: 20, depth: 20 };
+                    const halfWidth = buildingSize.width / 2;
+                    const halfDepth = buildingSize.depth / 2;
+
+                    // Box collision check using actual building dimensions
+                    const buildingBounds = {
+                        minX: building.position.x - halfWidth,
+                        maxX: building.position.x + halfWidth,
+                        minZ: building.position.z - halfDepth,
+                        maxZ: building.position.z + halfDepth
+                    };
+
+                    console.log('Building bounds:', buildingBounds);
+                    console.log('Projectile next position:', { x: nextX, z: nextZ });
 
                     if (nextX >= buildingBounds.minX && nextX <= buildingBounds.maxX &&
                         nextZ >= buildingBounds.minZ && nextZ <= buildingBounds.maxZ) {
+                        console.log('Hit detected on building type:', buildingType);
+                        
                         // Calculate impact point
                         const impactPoint = new THREE.Vector3(
                             projectile.position.x,
@@ -617,7 +639,9 @@ export class Tank {
 
                         // Deal damage to building
                         if (building.userData.buildingInstance) {
-                            building.userData.buildingInstance.takeDamage(25);
+                            // Gigafactory takes less damage due to its reinforced construction
+                            const damage = buildingType === 'military_gigafactory' ? 15 : 25;
+                            building.userData.buildingInstance.takeDamage(damage);
                         }
 
                         // Remove projectile
