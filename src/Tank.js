@@ -304,11 +304,6 @@ export class Tank {
         rightTailDetail.rotation.y = -Math.PI * 0.25;
         this.body.add(rightTailDetail);
 
-        // Add point light for taillight glow
-        const taillightGlow = new THREE.PointLight(0xff0000, 2, 10);
-        taillightGlow.position.set(0, 1.1, 2.3);
-        this.body.add(taillightGlow);
-
         // Turret (retractable weapon system)
         this.turret = new THREE.Group();
         
@@ -982,11 +977,16 @@ export class Tank {
         // Check collisions with base walls
         let canMove = true;
         if (Math.abs(nextX) < mapBoundary && Math.abs(nextZ) < mapBoundary) {
-            // Get all bases from the scene
+            // Get all bases and buildings from the scene
             const bases = [];
+            const buildings = [];
             this.scene.traverse((object) => {
-                if (object.type === 'Group' && object.userData.isBase) {
-                    bases.push(object.userData.baseInstance);
+                if (object.type === 'Group') {
+                    if (object.userData.isBase) {
+                        bases.push(object.userData.baseInstance);
+                    } else if (object.userData.isBuilding) {
+                        buildings.push(object);
+                    }
                 }
             });
 
@@ -1015,18 +1015,56 @@ export class Tank {
                 }
             ];
 
-            // Check collision for each corner point
-            for (const base of bases) {
+            // Check collision with buildings
+            for (const building of buildings) {
+                // Get building dimensions based on type
+                const buildingSizes = {
+                    'military_airport': { width: 55, depth: 30 },
+                    'military_barracks': { width: 30, depth: 20 },
+                    'military_control_tower': { width: 12, depth: 12 },
+                    'military_factory': { width: 30, depth: 20 },
+                    'military_science': { width: 25, depth: 25 },
+                    'military_gigafactory': { width: 40, depth: 60 }
+                };
+
+                const buildingType = building.userData.buildingType;
+                const buildingSize = buildingSizes[buildingType] || { width: 20, depth: 20 };
+                const halfWidth = buildingSize.width / 2;
+                const halfDepth = buildingSize.depth / 2;
+
+                // Building bounds
+                const buildingBounds = {
+                    minX: building.position.x - halfWidth,
+                    maxX: building.position.x + halfWidth,
+                    minZ: building.position.z - halfDepth,
+                    maxZ: building.position.z + halfDepth
+                };
+
+                // Check if any tank corner intersects with building bounds
                 for (const corner of cornerPoints) {
-                    if (base.isPointCollidingWithWalls(corner.x, corner.z)) {
-                        // Only allow movement if all corners are near a gate
-                        if (!base.isPointNearGate(corner.x, corner.z)) {
-                            canMove = false;
-                            break;
-                        }
+                    if (corner.x >= buildingBounds.minX && corner.x <= buildingBounds.maxX &&
+                        corner.z >= buildingBounds.minZ && corner.z <= buildingBounds.maxZ) {
+                        canMove = false;
+                        break;
                     }
                 }
                 if (!canMove) break;
+            }
+
+            // Check collision for each corner point with bases
+            if (canMove) {
+                for (const base of bases) {
+                    for (const corner of cornerPoints) {
+                        if (base.isPointCollidingWithWalls(corner.x, corner.z)) {
+                            // Only allow movement if all corners are near a gate
+                            if (!base.isPointNearGate(corner.x, corner.z)) {
+                                canMove = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (!canMove) break;
+                }
             }
 
             // Also check map boundaries for all corners
