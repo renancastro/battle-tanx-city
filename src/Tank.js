@@ -6,13 +6,15 @@ export class Tank {
         this.speed = 4.0;
         this.rotationSpeed = 0.4;
         this.turretRotationSpeed = 0.2;
-        this.tankType = tankType; // 'M1A1' or 'ModelS'
+        this.tankType = tankType; // 'M1A1', 'ModelS', 'T14', or 'Leopard2'
         
         // Audio system
         this.audioManager = audioManager;
         
-        // Health system
-        this.maxHealth = 100;
+        // Health system - different health values for different tanks
+        this.maxHealth = tankType === 'T14' ? 120 : // T-14 has more health due to advanced armor
+                        tankType === 'Leopard2' ? 110 : // Leopard 2 has slightly more health
+                        100; // Default health for M1A1 and Tesla
         this.currentHealth = this.maxHealth;
         
         // Movement state
@@ -70,10 +72,18 @@ export class Tank {
     }
 
     createTank() {
-        if (this.tankType === 'ModelS') {
-            this.createTeslaModelS();
-        } else {
-            this.createM1A1();
+        switch(this.tankType) {
+            case 'ModelS':
+                this.createTeslaModelS();
+                break;
+            case 'T14':
+                this.createT14Armata();
+                break;
+            case 'Leopard2':
+                this.createLeopard2();
+                break;
+            default:
+                this.createM1A1();
         }
 
         // Enable shadows
@@ -331,109 +341,381 @@ export class Tank {
         this.body.add(logo);
     }
 
-    createM1A1() {
-        // Tank materials
+    createT14Armata() {
+        // T-14 Armata materials
+        const tankMaterial = new THREE.MeshStandardMaterial({ 
+            color: this.tankColor,
+            roughness: 0.6,
+            metalness: 0.4
+        });
+        const trackMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a1a1a,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const detailMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2a2a2a,
+            roughness: 0.5,
+            metalness: 0.5
+        });
+
+        // Main body group
+        this.body = new THREE.Group();
+
+        // Main hull (distinctive angular design)
+        const hullGeometry = new THREE.BoxGeometry(4.2, 1.4, 6);
+        const hull = new THREE.Mesh(hullGeometry, tankMaterial);
+        hull.position.y = 0.7;
+        this.body.add(hull);
+
+        // Front glacis (heavily sloped armor)
+        const glacisGeometry = new THREE.BoxGeometry(4.2, 1.6, 2);
+        const glacis = new THREE.Mesh(glacisGeometry, tankMaterial);
+        glacis.position.set(0, 0.6, -2);
+        glacis.rotation.x = Math.PI * 0.15;
+        this.body.add(glacis);
+
+        // Track assemblies with ERA blocks
+        const trackGeometry = new THREE.BoxGeometry(1, 0.6, 6.4);
+        const leftTrack = new THREE.Mesh(trackGeometry, trackMaterial);
+        const rightTrack = new THREE.Mesh(trackGeometry, trackMaterial);
+        leftTrack.position.set(-2, -0.3, 0);
+        rightTrack.position.set(2, -0.3, 0);
+        this.body.add(leftTrack);
+        this.body.add(rightTrack);
+
+        // ERA (Explosive Reactive Armor) blocks
+        const eraGeometry = new THREE.BoxGeometry(0.4, 0.4, 0.8);
+        for (let z = -2.5; z <= 2.5; z += 1) {
+            for (let y = 0; y < 2; y++) {
+                const leftEra = new THREE.Mesh(eraGeometry, detailMaterial);
+                const rightEra = new THREE.Mesh(eraGeometry, detailMaterial);
+                leftEra.position.set(-2.1, 0.3 + y * 0.4, z);
+                rightEra.position.set(2.1, 0.3 + y * 0.4, z);
+                this.body.add(leftEra);
+                this.body.add(rightEra);
+            }
+        }
+
+        // Unmanned turret (distinctive feature of T-14)
+        this.turret = new THREE.Group();
+        
+        // Main turret body
+        const turretGeometry = new THREE.BoxGeometry(3, 0.8, 3.5);
+        const turret = new THREE.Mesh(turretGeometry, tankMaterial);
+        turret.position.y = 0.4;
+        this.turret.add(turret);
+
+        // Angular turret front
+        const turretFrontGeometry = new THREE.BoxGeometry(3, 0.8, 1);
+        const turretFront = new THREE.Mesh(turretFrontGeometry, tankMaterial);
+        turretFront.position.set(0, 0.4, -1.8);
+        turretFront.rotation.x = -Math.PI * 0.1;
+        this.turret.add(turretFront);
+
+        // Main gun (125mm 2A82-1M)
+        const mainGunGeometry = new THREE.CylinderGeometry(0.15, 0.15, 5, 16);
+        this.cannon = new THREE.Mesh(mainGunGeometry, detailMaterial);
+        this.cannon.position.z = 2.5;
+        this.cannon.rotation.x = Math.PI / 2;
+        this.turret.add(this.cannon);
+
+        // Advanced sighting systems and sensors
+        const sensorGeometry = new THREE.BoxGeometry(0.4, 0.2, 0.4);
+        const sensor1 = new THREE.Mesh(sensorGeometry, detailMaterial);
+        sensor1.position.set(0.8, 0.8, -1);
+        this.turret.add(sensor1);
+
+        const sensor2 = new THREE.Mesh(sensorGeometry, detailMaterial);
+        sensor2.position.set(-0.8, 0.8, -1);
+        this.turret.add(sensor2);
+
+        // Position turret on hull
+        this.turret.position.set(0, 1.4, 0);
+        this.body.add(this.turret);
+    }
+
+    createLeopard2() {
+        // Leopard 2A7 materials
         const tankMaterial = new THREE.MeshStandardMaterial({ 
             color: this.tankColor,
             roughness: 0.7,
             metalness: 0.3
         });
         const trackMaterial = new THREE.MeshStandardMaterial({
-            color: 0x1a1a1a,  // Dark gray for tracks
+            color: 0x1a1a1a,
             roughness: 0.9,
             metalness: 0.1
         });
         const detailMaterial = new THREE.MeshStandardMaterial({
-            color: 0x2a2a2a,  // Darker gray for details
+            color: 0x2a2a2a,
             roughness: 0.5,
             metalness: 0.5
         });
 
-        // Main hull (sloped armor)
-        const hullGeometry = new THREE.BoxGeometry(4, 1.2, 5);
-        this.body = new THREE.Mesh(hullGeometry, tankMaterial);
-        this.body.position.y = 0.6;
-        
-        // Front slope
-        const frontSlopeGeometry = new THREE.BoxGeometry(4, 1.4, 1.2);
-        const frontSlope = new THREE.Mesh(frontSlopeGeometry, tankMaterial);
-        frontSlope.position.set(0, 0.2, -2);
-        frontSlope.rotation.x = Math.PI * 0.1;
-        this.body.add(frontSlope);
+        // Main body group
+        this.body = new THREE.Group();
 
-        // Track assemblies
-        const trackGeometry = new THREE.BoxGeometry(0.8, 0.5, 5.4);
+        // Main hull
+        const hullGeometry = new THREE.BoxGeometry(4, 1.3, 5.8);
+        const hull = new THREE.Mesh(hullGeometry, tankMaterial);
+        hull.position.y = 0.65;
+        this.body.add(hull);
+
+        // Front glacis
+        const glacisGeometry = new THREE.BoxGeometry(4, 1.5, 1.8);
+        const glacis = new THREE.Mesh(glacisGeometry, tankMaterial);
+        glacis.position.set(0, 0.5, -2);
+        glacis.rotation.x = Math.PI * 0.12;
+        this.body.add(glacis);
+
+        // Track assemblies with side skirts
+        const trackGeometry = new THREE.BoxGeometry(0.8, 0.6, 6.2);
         const leftTrack = new THREE.Mesh(trackGeometry, trackMaterial);
         const rightTrack = new THREE.Mesh(trackGeometry, trackMaterial);
-        leftTrack.position.set(-1.8, -0.35, 0);
-        rightTrack.position.set(1.8, -0.35, 0);
+        leftTrack.position.set(-1.9, -0.3, 0);
+        rightTrack.position.set(1.9, -0.3, 0);
         this.body.add(leftTrack);
         this.body.add(rightTrack);
 
-        // Track wheels
-        const wheelGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.4, 16);
-        const wheelPositions = [-2.2, -1.5, -0.8, 0, 0.8, 1.5, 2.2];
+        // Side skirts
+        const skirtGeometry = new THREE.BoxGeometry(0.1, 0.8, 6);
+        const leftSkirt = new THREE.Mesh(skirtGeometry, tankMaterial);
+        const rightSkirt = new THREE.Mesh(skirtGeometry, tankMaterial);
+        leftSkirt.position.set(-2, 0.2, 0);
+        rightSkirt.position.set(2, 0.2, 0);
+        this.body.add(leftSkirt);
+        this.body.add(rightSkirt);
+
+        // Turret (angular, modern design)
+        this.turret = new THREE.Group();
+        
+        // Main turret body
+        const turretGeometry = new THREE.BoxGeometry(3.2, 1, 3.8);
+        const turret = new THREE.Mesh(turretGeometry, tankMaterial);
+        turret.position.y = 0.5;
+        this.turret.add(turret);
+
+        // Turret front with spaced armor
+        const turretFrontGeometry = new THREE.BoxGeometry(3.2, 1, 1.2);
+        const turretFront = new THREE.Mesh(turretFrontGeometry, tankMaterial);
+        turretFront.position.set(0, 0.5, -2);
+        turretFront.rotation.x = -Math.PI * 0.08;
+        this.turret.add(turretFront);
+
+        // Main gun (120mm L/55)
+        const mainGunGeometry = new THREE.CylinderGeometry(0.14, 0.14, 4.8, 16);
+        this.cannon = new THREE.Mesh(mainGunGeometry, detailMaterial);
+        this.cannon.position.z = 2.4;
+        this.cannon.rotation.x = Math.PI / 2;
+        this.turret.add(this.cannon);
+
+        // Commander's sight
+        const sightGeometry = new THREE.BoxGeometry(0.6, 0.4, 0.6);
+        const sight = new THREE.Mesh(sightGeometry, detailMaterial);
+        sight.position.set(0.8, 1, 0);
+        this.turret.add(sight);
+
+        // Position turret on hull
+        this.turret.position.set(0, 1.3, 0);
+        this.body.add(this.turret);
+    }
+
+    createM1A1() {
+        // M1A1 Abrams materials
+        const tankMaterial = new THREE.MeshStandardMaterial({ 
+            color: this.tankColor,
+            roughness: 0.7,
+            metalness: 0.3
+        });
+        const trackMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a1a1a,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+        const detailMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2a2a2a,
+            roughness: 0.5,
+            metalness: 0.5
+        });
+
+        // Main body group
+        this.body = new THREE.Group();
+
+        // Lower hull (with angled sides)
+        const lowerHullGeometry = new THREE.BoxGeometry(3.6, 0.8, 6.4);
+        const lowerHull = new THREE.Mesh(lowerHullGeometry, tankMaterial);
+        lowerHull.position.y = 0.4;
+        this.body.add(lowerHull);
+
+        // Hull side slopes (characteristic Abrams feature)
+        const sideAngle = Math.PI * 0.15; // 27 degrees
+        const sideSlopeGeometry = new THREE.BoxGeometry(0.6, 1.2, 6.2);
+        
+        const leftSlope = new THREE.Mesh(sideSlopeGeometry, tankMaterial);
+        leftSlope.position.set(-1.5, 0.8, 0);
+        leftSlope.rotation.z = sideAngle;
+        this.body.add(leftSlope);
+
+        const rightSlope = new THREE.Mesh(sideSlopeGeometry, tankMaterial);
+        rightSlope.position.set(1.5, 0.8, 0);
+        rightSlope.rotation.z = -sideAngle;
+        this.body.add(rightSlope);
+
+        // Front glacis (heavily sloped armor)
+        const glacisGeometry = new THREE.BoxGeometry(3.4, 1.6, 2);
+        const glacis = new THREE.Mesh(glacisGeometry, tankMaterial);
+        glacis.position.set(0, 0.6, -2.2);
+        glacis.rotation.x = Math.PI * 0.2; // Steeper angle
+        this.body.add(glacis);
+
+        // Rear plate (slightly angled)
+        const rearPlateGeometry = new THREE.BoxGeometry(3.4, 1.2, 0.8);
+        const rearPlate = new THREE.Mesh(rearPlateGeometry, tankMaterial);
+        rearPlate.position.set(0, 0.7, 2.8);
+        rearPlate.rotation.x = -Math.PI * 0.1;
+        this.body.add(rearPlate);
+
+        // Track assemblies with return rollers
+        const trackGeometry = new THREE.BoxGeometry(0.6, 0.4, 6.8);
+        const leftTrack = new THREE.Mesh(trackGeometry, trackMaterial);
+        const rightTrack = new THREE.Mesh(trackGeometry, trackMaterial);
+        leftTrack.position.set(-1.8, 0, 0);
+        rightTrack.position.set(1.8, 0, 0);
+        this.body.add(leftTrack);
+        this.body.add(rightTrack);
+
+        // Road wheels (7 per side)
+        const wheelGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.3, 16);
+        const wheelPositions = [-2.4, -1.6, -0.8, 0, 0.8, 1.6, 2.4];
+        
         wheelPositions.forEach(z => {
             const leftWheel = new THREE.Mesh(wheelGeometry, detailMaterial);
             const rightWheel = new THREE.Mesh(wheelGeometry, detailMaterial);
             leftWheel.rotation.z = Math.PI / 2;
             rightWheel.rotation.z = Math.PI / 2;
-            leftWheel.position.set(-1.8, -0.35, z);
-            rightWheel.position.set(1.8, -0.35, z);
+            leftWheel.position.set(-1.9, 0.3, z);
+            rightWheel.position.set(1.9, 0.3, z);
             this.body.add(leftWheel);
             this.body.add(rightWheel);
         });
 
-        // Turret base (characteristic Abrams angular turret)
-        const turretBaseGeometry = new THREE.BoxGeometry(2.2, 0.6, 2.4);
-        this.turret = new THREE.Mesh(turretBaseGeometry, tankMaterial);
-        this.turret.position.y = 0.9;
+        // Return rollers (3 per side)
+        const rollerGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.2, 12);
+        const rollerPositions = [-1.6, 0, 1.6];
+        
+        rollerPositions.forEach(z => {
+            const leftRoller = new THREE.Mesh(rollerGeometry, detailMaterial);
+            const rightRoller = new THREE.Mesh(rollerGeometry, detailMaterial);
+            leftRoller.rotation.z = Math.PI / 2;
+            rightRoller.rotation.z = Math.PI / 2;
+            leftRoller.position.set(-1.85, 0.7, z);
+            rightRoller.position.set(1.85, 0.7, z);
+            this.body.add(leftRoller);
+            this.body.add(rightRoller);
+        });
 
-        // Turret front slope
-        const turretFrontGeometry = new THREE.BoxGeometry(2.2, 0.7, 0.8);
-        const turretFront = new THREE.Mesh(turretFrontGeometry, tankMaterial);
-        turretFront.position.set(0, 0, -1.2);
-        turretFront.rotation.x = -Math.PI * 0.1;
-        this.turret.add(turretFront);
+        // Turret (distinctive Abrams design)
+        this.turret = new THREE.Group();
+        
+        // Main turret body
+        const turretGeometry = new THREE.BoxGeometry(3.2, 1.0, 4);
+        const turret = new THREE.Mesh(turretGeometry, tankMaterial);
+        turret.position.y = 0.5;
+        this.turret.add(turret);
 
-        // Turret side armor
-        const sideArmorGeometry = new THREE.BoxGeometry(0.3, 0.5, 1.8);
-        const leftArmor = new THREE.Mesh(sideArmorGeometry, tankMaterial);
-        const rightArmor = new THREE.Mesh(sideArmorGeometry, tankMaterial);
-        leftArmor.position.set(-1.2, 0, -0.3);
-        rightArmor.position.set(1.2, 0, -0.3);
-        this.turret.add(leftArmor);
-        this.turret.add(rightArmor);
+        // Turret cheeks (angular armor)
+        const cheekGeometry = new THREE.BoxGeometry(1.2, 1.0, 2);
+        
+        const leftCheek = new THREE.Mesh(cheekGeometry, tankMaterial);
+        leftCheek.position.set(-1.2, 0.5, -1);
+        leftCheek.rotation.y = Math.PI * 0.15;
+        this.turret.add(leftCheek);
 
-        // Main gun (120mm smoothbore)
-        const mainGunGeometry = new THREE.CylinderGeometry(0.12, 0.12, 4, 16);
+        const rightCheek = new THREE.Mesh(cheekGeometry, tankMaterial);
+        rightCheek.position.set(1.2, 0.5, -1);
+        rightCheek.rotation.y = -Math.PI * 0.15;
+        this.turret.add(rightCheek);
+
+        // Turret roof slope
+        const roofGeometry = new THREE.BoxGeometry(2.8, 0.4, 3.6);
+        const roof = new THREE.Mesh(roofGeometry, tankMaterial);
+        roof.position.set(0, 1.0, 0);
+        roof.rotation.x = -Math.PI * 0.03;
+        this.turret.add(roof);
+
+        // Bustle rack (ammo storage)
+        const bustleGeometry = new THREE.BoxGeometry(2.6, 0.8, 1.4);
+        const bustle = new THREE.Mesh(bustleGeometry, detailMaterial);
+        bustle.position.set(0, 0.6, 2);
+        this.turret.add(bustle);
+
+        // Main gun (120mm M256)
+        const mainGunGeometry = new THREE.CylinderGeometry(0.15, 0.15, 5, 16);
         this.cannon = new THREE.Mesh(mainGunGeometry, detailMaterial);
-        this.cannon.position.z = 2;
+        this.cannon.position.z = 2.5;
         this.cannon.rotation.x = Math.PI / 2;
+        this.turret.add(this.cannon);
 
-        // Gun mantlet
-        const mantletGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.35, 16);
+        // Gun mantlet (more detailed)
+        const mantletGeometry = new THREE.CylinderGeometry(0.35, 0.35, 0.6, 16);
         const mantlet = new THREE.Mesh(mantletGeometry, detailMaterial);
+        mantlet.position.z = 0.3;
         mantlet.rotation.x = Math.PI / 2;
-        mantlet.position.z = 0.2;
-        this.cannon.add(mantlet);
+        this.turret.add(mantlet);
 
-        // Commander's cupola
-        const cupolaGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.35, 8);
-        const cupola = new THREE.Mesh(cupolaGeometry, detailMaterial);
-        cupola.position.set(-0.5, 0.45, 0.3);
-        this.turret.add(cupola);
+        // Commander's cupola (more detailed)
+        const cupolaBaseGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 8);
+        const cupolaBase = new THREE.Mesh(cupolaBaseGeometry, detailMaterial);
+        cupolaBase.position.set(0.8, 1.2, 0.2);
+        this.turret.add(cupolaBase);
+
+        const cupolaTopGeometry = new THREE.CylinderGeometry(0.4, 0.5, 0.3, 8);
+        const cupolaTop = new THREE.Mesh(cupolaTopGeometry, detailMaterial);
+        cupolaTop.position.set(0.8, 1.5, 0.2);
+        this.turret.add(cupolaTop);
 
         // Loader's hatch
-        const loaderHatchGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.25, 8);
+        const loaderHatchGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 8);
         const loaderHatch = new THREE.Mesh(loaderHatchGeometry, detailMaterial);
-        loaderHatch.position.set(0.5, 0.45, 0.3);
+        loaderHatch.position.set(-0.8, 1.2, 0.2);
         this.turret.add(loaderHatch);
 
-        // Add turret to body
+        // Thermal sight housing (CITV)
+        const citvGeometry = new THREE.BoxGeometry(0.4, 0.5, 0.6);
+        const citv = new THREE.Mesh(citvGeometry, detailMaterial);
+        citv.position.set(1.2, 1.3, -0.4);
+        this.turret.add(citv);
+
+        // Gunner's sight
+        const gunnerSightGeometry = new THREE.BoxGeometry(0.3, 0.3, 0.5);
+        const gunnerSight = new THREE.Mesh(gunnerSightGeometry, detailMaterial);
+        gunnerSight.position.set(-0.6, 1.1, -1.2);
+        this.turret.add(gunnerSight);
+
+        // Smoke grenade launchers
+        const launcherGeometry = new THREE.BoxGeometry(0.15, 0.15, 0.4);
+        for (let i = 0; i < 4; i++) {
+            const leftLauncher = new THREE.Mesh(launcherGeometry, detailMaterial);
+            const rightLauncher = new THREE.Mesh(launcherGeometry, detailMaterial);
+            leftLauncher.position.set(-1.6, 0.8, -1 + i * 0.3);
+            rightLauncher.position.set(1.6, 0.8, -1 + i * 0.3);
+            this.turret.add(leftLauncher);
+            this.turret.add(rightLauncher);
+        }
+
+        // Position turret on hull
+        this.turret.position.set(0, 1.2, -0.2); // Slightly forward
         this.body.add(this.turret);
-        // Add cannon to turret
-        this.turret.add(this.cannon);
+
+        // Add side skirts
+        const skirtGeometry = new THREE.BoxGeometry(0.1, 0.6, 6);
+        const leftSkirt = new THREE.Mesh(skirtGeometry, tankMaterial);
+        const rightSkirt = new THREE.Mesh(skirtGeometry, tankMaterial);
+        leftSkirt.position.set(-2, 0.5, 0);
+        rightSkirt.position.set(2, 0.5, 0);
+        this.body.add(leftSkirt);
+        this.body.add(rightSkirt);
     }
 
     createMuzzleFlash() {
