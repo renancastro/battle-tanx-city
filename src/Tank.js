@@ -883,7 +883,6 @@ export class Tank {
                     };
 
                     const buildingType = building.userData.buildingType;
-                    console.log('Checking collision with building type:', buildingType);
                     
                     const buildingSize = buildingSizes[buildingType] || { width: 20, depth: 20 };
                     const halfWidth = buildingSize.width / 2;
@@ -897,12 +896,8 @@ export class Tank {
                         maxZ: building.position.z + halfDepth
                     };
 
-                    console.log('Building bounds:', buildingBounds);
-                    console.log('Projectile next position:', { x: nextX, z: nextZ });
-
                     if (nextX >= buildingBounds.minX && nextX <= buildingBounds.maxX &&
                         nextZ >= buildingBounds.minZ && nextZ <= buildingBounds.maxZ) {
-                        console.log('Hit detected on building type:', buildingType);
                         
                         // Calculate impact point
                         const impactPoint = new THREE.Vector3(
