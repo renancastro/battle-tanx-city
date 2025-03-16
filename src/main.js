@@ -5,6 +5,7 @@ import { Road } from './Road.js';
 import { Building } from './Building.js';
 import { UI } from './UI.js';
 import { AudioManager } from './AudioManager.js';
+import { NetworkManager } from './NetworkManager.js';
 
 // Game state
 const keys = {
@@ -75,6 +76,12 @@ const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
+
+// Initialize NetworkManager
+const networkManager = new NetworkManager(scene);
+
+// Map of other players' tanks
+const remotePlayers = new Map();
 
 // Create grid pattern
 function createGrid() {
@@ -471,23 +478,203 @@ function createBoundaryWalls() {
 generateCity();
 createBoundaryWalls();
 
-// Create player tank
-const tank = new Tank(scene, audioManager, 'M1A1'); // 'M1A1', 'ModelS', 'T14', or 'Leopard2'
+// Initialize local player's tank (will be created after server connection)
+let tank = null;
+
+// Network event handlers
+networkManager.onInit((data) => {
+    console.log('Initializing player with data:', data);
+    
+    // Create local player's tank with assigned team color
+    const teamColors = {
+        'red': 0xff0000,
+        'blue': 0x0000ff,
+        'green': 0x00ff00,
+        'yellow': 0xffff00
+    };
+
+    // Create tank with team color
+    tank = new Tank(scene, audioManager, 'M1A1');
+    
+    // Set tank color based on team
+    const teamColor = teamColors[data.team] || 0xff0000; // Default to red if team color not found
+    tank.body.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+            if (object.material) {
+                object.material.color.setHex(teamColor);
+            }
+            // Also set color for any child materials
+            if (object.children) {
+                object.children.forEach(child => {
+                    if (child.material) {
+                        child.material.color.setHex(teamColor);
+                    }
+                });
+            }
+        }
+    });
+
+    // Position tank in the correct base
+    if (data.position) {
+        tank.body.position.copy(data.position);
+    }
+    if (data.rotation) {
+        tank.body.rotation.y = data.rotation.y;
+    }
+    
+    // Initialize other players
+    data.players?.forEach(playerData => {
+        if (playerData.id !== networkManager.playerId) {
+            createRemotePlayer(playerData);
+        }
+    });
+
+    // Update camera to look at tank
+    const tankPos = tank.getPosition();
+    camera.position.set(
+        tankPos.x - Math.sin(tank.getRotation()) * cameraSettings.distance,
+        cameraSettings.currentHeight,
+        tankPos.z - Math.cos(tank.getRotation()) * cameraSettings.distance
+    );
+    camera.lookAt(new THREE.Vector3(tankPos.x, tankPos.y + 0.5, tankPos.z));
+
+    // Start the animation loop
+    animate();
+});
+
+networkManager.onPlayerJoined((data) => {
+    if (data.id !== networkManager.playerId) {
+        createRemotePlayer(data);
+    }
+});
+
+networkManager.onPlayerLeft((data) => {
+    const remotePlayer = remotePlayers.get(data.id);
+    if (remotePlayer) {
+        scene.remove(remotePlayer);
+        remotePlayers.delete(data.id);
+    }
+});
+
+networkManager.onPlayerUpdated((data) => {
+    const remotePlayer = remotePlayers.get(data.id);
+    if (remotePlayer) {
+        // Update position
+        remotePlayer.body.position.set(
+            data.position.x,
+            data.position.y,
+            data.position.z
+        );
+        // Update rotations
+        remotePlayer.body.rotation.y = data.rotation.y;
+        remotePlayer.turret.rotation.y = data.turretRotation.y;
+    }
+});
+
+networkManager.onProjectileCreated((data) => {
+    if (data.playerId !== networkManager.playerId) {
+        // Create projectile for remote player
+        const projectile = new THREE.Mesh(
+            new THREE.SphereGeometry(0.2),
+            new THREE.MeshBasicMaterial({ 
+                color: 0xff0000,
+                emissive: 0xff0000,
+                emissiveIntensity: 1,
+                toneMapped: false
+            })
+        );
+        projectile.position.copy(data.position);
+        projectile.userData.velocity = data.velocity;
+        projectile.userData.createdAt = Date.now();
+        scene.add(projectile);
+        projectiles.push(projectile);
+    }
+});
+
+networkManager.onProjectileRemoved((data) => {
+    const index = projectiles.findIndex(p => p.userData.id === data.id);
+    if (index !== -1) {
+        scene.remove(projectiles[index]);
+        projectiles.splice(index, 1);
+    }
+});
+
+networkManager.onPlayerDamaged((data) => {
+    if (data.id === networkManager.playerId) {
+        tank.takeDamage(data.damage);
+    } else {
+        const remotePlayer = remotePlayers.get(data.id);
+        if (remotePlayer) {
+            remotePlayer.takeDamage(data.damage);
+        }
+    }
+});
+
+networkManager.onPlayerDestroyed((data) => {
+    if (data.id === networkManager.playerId) {
+        tank.onDestroyed();
+    } else {
+        const remotePlayer = remotePlayers.get(data.id);
+        if (remotePlayer) {
+            remotePlayer.onDestroyed();
+        }
+    }
+});
+
+function createRemotePlayer(playerData) {
+    const teamColors = {
+        'red': 0xff0000,
+        'blue': 0x0000ff,
+        'green': 0x00ff00,
+        'yellow': 0xffff00
+    };
+
+    const remotePlayer = new Tank(scene, audioManager, playerData.tankType);
+    
+    // Set position and rotation using Vector3
+    remotePlayer.body.position.set(
+        playerData.position.x,
+        playerData.position.y,
+        playerData.position.z
+    );
+    remotePlayer.body.rotation.y = playerData.rotation.y;
+    remotePlayer.turret.rotation.y = playerData.turretRotation.y;
+
+    // Set team color
+    const teamColor = teamColors[playerData.team] || 0xff0000;
+    remotePlayer.body.traverse((object) => {
+        if (object instanceof THREE.Mesh) {
+            if (object.material) {
+                object.material.color.setHex(teamColor);
+            }
+            // Also set color for any child materials
+            if (object.children) {
+                object.children.forEach(child => {
+                    if (child.material) {
+                        child.material.color.setHex(teamColor);
+                    }
+                });
+            }
+        }
+    });
+
+    remotePlayers.set(playerData.id, remotePlayer);
+}
 
 // Camera setup
-camera.position.set(0, 15, 15); // Reduced initial z distance from 20 to 15
-camera.lookAt(tank.getPosition());
+camera.position.set(0, 15, 15);
+camera.lookAt(new THREE.Vector3(0, 0, 0));
 
 // Camera controls
 const cameraSettings = {
-    minHeight: 2,      // Keep minimum height the same
-    maxHeight: 50,     // Keep maximum height the same
-    scrollSpeed: 1,    // Keep scroll speed the same
-    distance: 15,      // Reduced default distance from 20 to 15
-    currentHeight: 15, // Keep initial height the same
-    minDistance: 3,    // Reduced minimum distance from 5 to 3
-    rotationLag: 0.1,  // Keep rotation lag the same
-    currentRotation: 0 // Keep rotation tracking
+    minHeight: 2,
+    maxHeight: 50,
+    scrollSpeed: 1,
+    distance: 15,
+    currentHeight: 15,
+    minDistance: 3,
+    rotationLag: 0.1,
+    currentRotation: 0
 };
 
 // Mouse movement
@@ -518,17 +705,16 @@ function onMouseWheel(event) {
 }
 
 function onMouseDown(event) {
-    if (event.button === 0) { // Left mouse button
-        // Tank firing
+    if (event.button === 0 && tank) { // Left mouse button
         tank.fireProjectile();
         
-        // Coordinate logging
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObject(ground);
-        if (intersects.length > 0) {
-            const point = intersects[0].point;
-            console.log(`Clicked coordinates: x: ${point.x.toFixed(2)}, z: ${point.z.toFixed(2)}`);
-        }
+        // Send fire event to server
+        const position = tank.getPosition();
+        const direction = new THREE.Vector3(0, 0, 1);
+        direction.applyQuaternion(tank.turret.getWorldQuaternion(new THREE.Quaternion()));
+        direction.multiplyScalar(tank.projectileSpeed);
+        
+        networkManager.sendFire(position, direction);
     }
 }
 
@@ -564,18 +750,20 @@ let lastTime = performance.now();
 let frameCount = 0;
 let fpsDisplayTime = 0;
 let currentFps = 0;
+let lastNetworkUpdate = 0;
+const NETWORK_UPDATE_INTERVAL = 50; // Send position updates every 50ms
 
 // Create FPS display
 const fpsDisplay = document.createElement('div');
 fpsDisplay.style.position = 'fixed';
-fpsDisplay.style.top = '70px'; // Position below score display
+fpsDisplay.style.top = '70px';
 fpsDisplay.style.right = '20px';
 fpsDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-fpsDisplay.style.padding = '10px 20px'; // Match score display padding
-fpsDisplay.style.borderRadius = '5px'; // Match score display border radius
+fpsDisplay.style.padding = '10px 20px';
+fpsDisplay.style.borderRadius = '5px';
 fpsDisplay.style.color = '#fff';
 fpsDisplay.style.fontFamily = 'Arial, sans-serif';
-fpsDisplay.style.fontSize = '16px'; // Slightly smaller than score (24px)
+fpsDisplay.style.fontSize = '16px';
 fpsDisplay.style.zIndex = '1000';
 fpsDisplay.style.userSelect = 'none';
 fpsDisplay.style.pointerEvents = 'none';
@@ -584,10 +772,10 @@ document.body.appendChild(fpsDisplay);
 function animate() {
     requestAnimationFrame(animate);
 
-    // Calculate FPS
     const currentTime = performance.now();
+
+    // Calculate FPS
     frameCount++;
-    
     if (currentTime > fpsDisplayTime + 1000) {
         currentFps = Math.round((frameCount * 1000) / (currentTime - fpsDisplayTime));
         fpsDisplay.textContent = `FPS: ${currentFps}`;
@@ -595,46 +783,53 @@ function animate() {
         frameCount = 0;
     }
 
-    // Update tank
-    tank.update(ground, mouse, raycaster, camera);
+    if (tank) {
+        // Update tank
+        tank.update(ground, mouse, raycaster, camera);
 
-    // Update camera position to follow behind tank
-    const tankPos = tank.getPosition();
-    const tankRotation = tank.getRotation();
-    
-    // Smoothly interpolate camera rotation
-    const rotationDiff = tankRotation - cameraSettings.currentRotation;
-    
-    // Handle rotation wrap-around
-    if (rotationDiff > Math.PI) {
-        cameraSettings.currentRotation += Math.PI * 2;
-    } else if (rotationDiff < -Math.PI) {
-        cameraSettings.currentRotation -= Math.PI * 2;
+        // Send position updates to server
+        if (currentTime - lastNetworkUpdate > NETWORK_UPDATE_INTERVAL) {
+            networkManager.sendPosition(
+                tank.getPosition(),
+                { y: tank.getRotation() },
+                { y: tank.turret.rotation.y }
+            );
+            lastNetworkUpdate = currentTime;
+        }
+
+        // Update camera position to follow tank
+        const tankPos = tank.getPosition();
+        const tankRotation = tank.getRotation();
+        
+        // Camera follow logic
+        const rotationDiff = tankRotation - cameraSettings.currentRotation;
+        
+        if (rotationDiff > Math.PI) {
+            cameraSettings.currentRotation += Math.PI * 2;
+        } else if (rotationDiff < -Math.PI) {
+            cameraSettings.currentRotation -= Math.PI * 2;
+        }
+        
+        cameraSettings.currentRotation += rotationDiff * cameraSettings.rotationLag;
+        
+        camera.position.x = tankPos.x - Math.sin(cameraSettings.currentRotation) * cameraSettings.distance;
+        camera.position.z = tankPos.z - Math.cos(cameraSettings.currentRotation) * cameraSettings.distance;
+        camera.position.y = cameraSettings.currentHeight;
+
+        const lookAtHeight = Math.max(0.5, cameraSettings.currentHeight * 0.1);
+        camera.lookAt(new THREE.Vector3(tankPos.x, tankPos.y + lookAtHeight, tankPos.z));
+
+        // Update directional light position relative to tank
+        directionalLight.position.set(
+            tankPos.x + 20,
+            50,
+            tankPos.z + 20
+        );
+        directionalLight.target = tank.body;
     }
-    
-    cameraSettings.currentRotation += rotationDiff * cameraSettings.rotationLag;
-    
-    // Calculate camera position using interpolated rotation
-    camera.position.x = tankPos.x - Math.sin(cameraSettings.currentRotation) * cameraSettings.distance;
-    camera.position.z = tankPos.z - Math.cos(cameraSettings.currentRotation) * cameraSettings.distance;
-    camera.position.y = cameraSettings.currentHeight;
-
-    // Adjust look-at point based on height
-    const lookAtHeight = Math.max(0.5, cameraSettings.currentHeight * 0.1);
-    camera.lookAt(new THREE.Vector3(tankPos.x, tankPos.y + lookAtHeight, tankPos.z));
-
-    // Update directional light position relative to tank
-    directionalLight.position.set(
-        tankPos.x + 20,
-        50,
-        tankPos.z + 20
-    );
-    directionalLight.target = tank.body;
 
     renderer.render(scene, camera);
 }
-
-animate();
 
 // Create controls overlay
 function createControlsOverlay() {
@@ -678,5 +873,6 @@ function createControlsOverlay() {
     document.body.appendChild(overlay);
 }
 
-// Call this after scene initialization
-createControlsOverlay(); 
+// Start the game
+createControlsOverlay();
+networkManager.connect(); 
